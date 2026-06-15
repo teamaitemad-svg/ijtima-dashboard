@@ -48,7 +48,7 @@ async function readBootstrap(fallback) {
   }
 
   const [scheduleRows, announcementRows, masterMemberRows, memberRows, attendanceRows, rankingRows, competitionRows] = await Promise.all([
-    getValues(tabs.schedule, "A2:F"),
+    getValues(tabs.schedule, "A1:G"),
     getValues(tabs.announcements, "A2:D"),
     getValues(tabs.masterMembers, "A2:D").catch(() => []),
     getValues(tabs.members, "A2:F"),
@@ -57,13 +57,17 @@ async function readBootstrap(fallback) {
     getValues(tabs.competitions, "A2:E"),
   ]);
 
-  const scheduleItems = mapRows(scheduleRows, (row) => ({
-    start: row[0],
-    end: row[1],
-    title: row[2],
-    location: row[3],
-    lead: row[4],
-    status: row[5] || "Upcoming",
+  const scheduleHeaders = (scheduleRows[0] || []).map((header) => String(header || "").trim().toLowerCase());
+  const hasScheduleDate = scheduleHeaders.includes("date");
+  const scheduleValueRows = scheduleHeaders.includes("start") ? scheduleRows.slice(1) : scheduleRows;
+  const scheduleItems = mapRows(scheduleValueRows, (row) => ({
+    date: hasScheduleDate ? row[scheduleHeaders.indexOf("date")] : "",
+    start: hasScheduleDate ? row[scheduleHeaders.indexOf("start")] : row[0],
+    end: hasScheduleDate ? row[scheduleHeaders.indexOf("end")] : row[1],
+    title: hasScheduleDate ? row[scheduleHeaders.indexOf("title")] : row[2],
+    location: hasScheduleDate ? row[scheduleHeaders.indexOf("location")] : row[3],
+    lead: hasScheduleDate ? row[scheduleHeaders.indexOf("lead")] : row[4],
+    status: (hasScheduleDate ? row[scheduleHeaders.indexOf("status")] : row[5]) || "Upcoming",
   }));
 
   const announcements = mapRows(announcementRows, (row) => ({
@@ -152,6 +156,14 @@ async function readBootstrap(fallback) {
 
 async function appendScheduleItem(item) {
   if (!isSheetsConfigured()) {
+    return;
+  }
+
+  const headerRows = await getValues(tabs.schedule, "A1:G").catch(() => []);
+  const headers = (headerRows[0] || []).map((header) => String(header || "").trim().toLowerCase());
+
+  if (headers.includes("date")) {
+    await appendValues(tabs.schedule, "A:G", [[item.date, item.start, item.end, item.title, item.location, item.lead, item.status]]);
     return;
   }
 

@@ -4,6 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Majlis Muqami MKAC Ijtima</title>
+    <link rel="preload" href="styles.css" as="style" />
+    <link rel="preload" href="app.js" as="script" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -12,7 +14,7 @@
         <button class="icon-button close-login" id="closeLoginButton" type="button" aria-label="Close login">X</button>
 
         <div class="brand login-brand">
-          <span class="brand-mark">ID</span>
+          <img class="brand-mark" src="/logo.png" alt="Majlis Muqami MKAC Ijtima" />
           <div>
             <strong>Majlis Muqami MKAC Ijtima</strong>
             <span>Authorized access</span>
@@ -45,12 +47,11 @@
       <aside class="sidebar" aria-label="Main navigation">
         <div class="sidebar-header">
           <div class="brand">
-            <span class="brand-mark">ID</span>
+            <img class="brand-mark" src="/logo.png" alt="Majlis Muqami MKAC Ijtima" />
             <div class="brand-copy">
               <strong>Majlis Muqami MKAC Ijtima</strong>
             </div>
           </div>
-          <button class="icon-button sidebar-toggle" id="sidebarToggle" type="button" aria-label="Collapse sidebar">☰</button>
         </div>
 
         <nav class="nav-list" id="navList"></nav>
@@ -76,6 +77,6 @@
       </main>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js" defer></script>
   </body>
 </html>

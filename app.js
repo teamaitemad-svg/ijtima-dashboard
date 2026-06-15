@@ -9,7 +9,6 @@ const sessionLabel = document.querySelector("#sessionLabel");
 const signedInUser = document.querySelector("#signedInUser");
 const logoutButton = document.querySelector("#logoutButton");
 const appShell = document.querySelector(".app-shell");
-const sidebarToggle = document.querySelector("#sidebarToggle");
 const navList = document.querySelector("#navList");
 const dashboardGrid = document.querySelector("#dashboardGrid");
 const pageTitle = document.querySelector("#pageTitle");
@@ -41,7 +40,6 @@ let adminUserRoleFilter = "All";
 let editingScheduleRow = null;
 let editingAnnouncementRow = null;
 let editingUserRow = null;
-let isSidebarCollapsed = false;
 let judgeMessage = "";
 let educationSelectedCompetition = "Tilawat";
 let educationRosterAdminCompetition = "Tilawat";
@@ -171,6 +169,7 @@ const roleLabels = {
 
 let scheduleItems = [
   {
+    date: "2026-06-19",
     start: "09:00 AM",
     end: "09:30 AM",
     title: "Opening Session",
@@ -179,6 +178,7 @@ let scheduleItems = [
     status: "Completed",
   },
   {
+    date: "2026-06-19",
     start: "09:30 AM",
     end: "10:15 AM",
     title: "Tilawat & Nazm",
@@ -187,6 +187,7 @@ let scheduleItems = [
     status: "Live",
   },
   {
+    date: "2026-06-19",
     start: "10:20 AM",
     end: "11:15 AM",
     title: "Educational Competitions",
@@ -195,6 +196,7 @@ let scheduleItems = [
     status: "Next",
   },
   {
+    date: "2026-06-19",
     start: "10:30 AM",
     end: "12:00 PM",
     title: "Sports Round 1",
@@ -203,6 +205,7 @@ let scheduleItems = [
     status: "Upcoming",
   },
   {
+    date: "2026-06-19",
     start: "12:15 PM",
     end: "01:00 PM",
     title: "Lunch & Prayer Break",
@@ -570,7 +573,7 @@ function getPublicPanelId(title) {
   const panelIds = {
     "Live Schedule": "public-schedule",
     Announcements: "public-announcements",
-    "Location Quick Links": "public-locations",
+    "Documents": "public-documents",
     "Help & Emergency": "public-help",
     "Halqa Position Report": "public-rankings",
     "Competition Positions": "public-competitions",
@@ -592,7 +595,7 @@ function syncPublicHashNavigation() {
     return;
   }
 
-  if (hash === "public-announcements" || hash === "public-locations" || hash === "public-prayer-times" || hash === "public-competitions" || hash === "public-services" || hash === "public-weather" || hash === "public-live-now") {
+  if (hash === "public-announcements" || hash === "public-documents" || hash === "public-prayer-times" || hash === "public-competitions" || hash === "public-services" || hash === "public-weather" || hash === "public-live-now") {
     scrollToDashboardTarget(hash);
   }
 }
@@ -600,18 +603,18 @@ function syncPublicHashNavigation() {
 window.addEventListener("hashchange", syncPublicHashNavigation);
 
 const navItems = {
-  public: ["Overview", "Schedule", "Announcements", "Locations", "Competitions", "Help"],
+  public: ["Overview", "Schedule", "Announcements", "Documents", "Competitions", "Help"],
   zaim: ["Dashboard", "Members", "Attendance", "Rankings"],
   attendance: ["Check-In Station", "Manual Entry", "Activity Log", "Issues"],
   educationJudge: ["Final Positions"],
   sportsAdmin: ["Final Positions"],
-  admin: ["Overview", "Schedule Manager", "Announcements", "Registrations", "Attendance Input", "Attendance Reports", "Competitions", "Users"],
+  admin: ["Overview", "Schedule Manager", "Announcements", "Registrations", "Attendance Input", "Attendance Reports", "Competitions", "Users", "Documents"],
 };
 
 const adminNavGroups = [
   { label: "Manage", items: ["Overview", "Schedule Manager", "Announcements"] },
   { label: "Operations", items: ["Registrations", "Attendance Input", "Attendance Reports", "Competitions"] },
-  { label: "Admin", items: ["Users"] },
+  { label: "Admin", items: ["Users", "Documents"] },
 ];
 
 const navIconMap = {
@@ -619,7 +622,7 @@ const navIconMap = {
   Dashboard: "grid",
   Schedule: "calendar",
   "Live Schedule": "calendar",
-  Locations: "map",
+  Documents: "file",
   Help: "phone",
   "Competition Results": "trophy",
   "Halqa Positions": "chart",
@@ -677,6 +680,7 @@ function iconSvg(name) {
     award: '<circle cx="12" cy="8" r="5"></circle><path d="M8.5 12.5 7 21l5-3 5 3-1.5-8.5"></path>',
     map: '<path d="M9 18 3 21V6l6-3 6 3 6-3v15l-6 3-6-3Z"></path><path d="M9 3v15"></path><path d="M15 6v15"></path>',
     phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.4 2.1L8.1 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.6 1.9Z"></path>',
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>',
   };
   return `<svg class="nav-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">${icons[name] || icons.grid}</svg>`;
 }
@@ -686,7 +690,7 @@ const panels = {
     {
       size: "large",
       title: "Live Schedule",
-      body: "Shows current and upcoming programs by Ijtima location. We will connect this to a Schedule sheet later.",
+      body: "",
       metrics: [
         ["3", "Active locations"],
         ["1", "Program live now"],
@@ -715,8 +719,8 @@ const panels = {
     },
     {
       size: "full",
-      title: "Location Quick Links",
-      body: "Fast access to common Ijtima locations. These can later connect to maps or indoor directions.",
+      title: "Documents",
+      body: "Download the Ijtima Syllabus and Sports Package PDFs.",
     },
     {
       size: "full",
@@ -830,6 +834,11 @@ const panels = {
       body: "Review dashboard users, roles, assigned halqajat, and access levels.",
     },
     {
+      size: "full",
+      title: "Admin Documents",
+      body: "Upload the Ijtima Syllabus and Sports Package PDFs for public download.",
+    },
+    {
       size: "medium",
       title: "Google Sheets Data",
       body: "Registrations, attendance, schedule, competitions, and users can be linked to separate Sheet tabs.",
@@ -838,7 +847,13 @@ const panels = {
   ],
 };
 
+let _lastNavRole = null;
+let _lastNavSection = null;
+
 function renderNav(role) {
+  if (role === _lastNavRole && currentSection === _lastNavSection) return;
+  _lastNavRole = role;
+  _lastNavSection = currentSection;
   navList.innerHTML = "";
 
   const groups =
@@ -872,27 +887,12 @@ function renderNav(role) {
   });
 }
 
-function getTimeUntilLabel(timeText, expiredLabel = "Starting soon") {
-  const match = String(timeText || "").match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+function getTimeUntilLabel(timeText, expiredLabel = "Starting soon", dateText = "") {
+  const target = parseScheduleDateTime({ date: dateText, start: timeText }, "start");
 
-  if (!match) {
+  if (!target) {
     return expiredLabel;
   }
-
-  const target = new Date();
-  let hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  const meridiem = match[3].toUpperCase();
-
-  if (meridiem === "PM" && hours !== 12) {
-    hours += 12;
-  }
-
-  if (meridiem === "AM" && hours === 12) {
-    hours = 0;
-  }
-
-  target.setHours(hours, minutes, 0, 0);
   const diffMinutes = Math.round((target.getTime() - Date.now()) / 60000);
 
   if (diffMinutes <= 0) {
@@ -945,7 +945,8 @@ function getVenueTone(location) {
 function renderSchedule() {
   const liveItem = getLiveScheduleItem();
   const nextItem = getNextScheduleItem();
-  const liveCount = scheduleItems.filter((item) => String(item.status || "").toLowerCase() === "live").length;
+  const nextRowId = getNextScheduleRowId();
+  const liveCount = scheduleItems.filter((item) => getComputedScheduleStatus(item, nextRowId) === "Live").length;
   const venueCount = new Set(scheduleItems.map((item) => item.location).filter(Boolean)).size;
   const currentTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -963,12 +964,12 @@ function renderSchedule() {
             <h3>${liveItem.title || "Program Live"}</h3>
             <p>${liveItem.location || "Main Hall"} • ${liveItem.lead || "Program Team"}</p>
           </div>
-          <strong>Ends in ${getTimeUntilLabel(liveItem.end, "Soon")}</strong>
+          <strong>Ends in ${getTimeUntilLabel(liveItem.end, "Soon", liveItem.date)}</strong>
         </div>
         <div class="schedule-next-card">
           <span class="schedule-kicker">Next Event</span>
           <h3>${nextItem.title || "Next Program"}</h3>
-          <p>${nextItem.location || "Main Hall"} • Starts in ${getTimeUntilLabel(nextItem.start, "Soon")}</p>
+          <p>${nextItem.location || "Main Hall"} • Starts in ${getTimeUntilLabel(nextItem.start, "Soon", nextItem.date)}</p>
         </div>
       </div>
 
@@ -979,7 +980,7 @@ function renderSchedule() {
         </div>
         <div>
           <span>Next</span>
-          <strong>${getTimeUntilLabel(nextItem.start, "Soon")}</strong>
+          <strong>${getTimeUntilLabel(nextItem.start, "Soon", nextItem.date)}</strong>
         </div>
         <div>
           <span>Venues</span>
@@ -987,31 +988,32 @@ function renderSchedule() {
         </div>
       </div>
 
-      <div class="schedule-filter-row" aria-label="Quick filters">
-        <span>All</span>
-        <span>Live</span>
-        <span>Main Hall</span>
-        <span>Sports</span>
-        <span>Education</span>
-      </div>
-
       <div class="schedule-timeline" aria-label="Live schedule timeline">
       ${scheduleItems
+        .map((item, index) => ({ item, index, startDate: parseScheduleDateTime(item, "start") }))
+        .sort((a, b) => {
+          if (a.startDate && b.startDate) {
+            return a.startDate.getTime() - b.startDate.getTime();
+          }
+
+          return a.index - b.index;
+        })
         .map(
-          (item) => {
-            const status = String(item.status || "Upcoming").toLowerCase();
+          ({ item }) => {
+            const status = getComputedScheduleStatus(item, nextRowId).toLowerCase();
             const statusMeta = getScheduleStatusMeta(status);
             const venueTone = getVenueTone(item.location);
             const timingLabel =
               status === "live"
-                ? `Ends in ${getTimeUntilLabel(item.end, "Soon")}`
+                ? `Ends in ${getTimeUntilLabel(item.end, "Soon", item.date)}`
                 : status === "next"
-                  ? `Starts in ${getTimeUntilLabel(item.start, "Soon")}`
+                  ? `Starts in ${getTimeUntilLabel(item.start, "Soon", item.date)}`
                   : `${item.start} - ${item.end}`;
 
             return `
             <article class="schedule-item status-${status}">
               <div class="schedule-time">
+                <span>${formatScheduleDate(item.date)}</span>
                 <strong>${item.start}</strong>
                 <span>${item.end}</span>
               </div>
@@ -1028,7 +1030,7 @@ function renderSchedule() {
           `;
           }
         )
-        .join("")}
+        .join("") || `<p class="schedule-empty-filter">No programs match this filter.</p>`}
       </div>
     </div>
   `;
@@ -1212,18 +1214,18 @@ function renderAnnouncements() {
 function getLiveScheduleItem() {
   const now = new Date();
   const timedLiveItem = scheduleItems.find((item) => {
-    const start = parseTodayTime(item.start);
-    const end = parseTodayTime(item.end);
+    const start = parseScheduleDateTime(item, "start");
+    const end = parseScheduleDateTime(item, "end");
     return start && end && start.getTime() <= now.getTime() && end.getTime() > now.getTime();
   });
 
-  return timedLiveItem || scheduleItems.find((item) => String(item.status || "").toLowerCase() === "live") || scheduleItems[0] || {};
+  return timedLiveItem || scheduleItems.find((item) => String(item.status || "").toLowerCase() === "live") || {};
 }
 
 function getNextScheduleItem() {
   const now = new Date();
   const timedNextItem = scheduleItems
-    .map((item) => ({ ...item, startDate: parseTodayTime(item.start) }))
+    .map((item) => ({ ...item, startDate: parseScheduleDateTime(item, "start") }))
     .filter((item) => item.startDate && item.startDate.getTime() > now.getTime())
     .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())[0];
 
@@ -1231,32 +1233,17 @@ function getNextScheduleItem() {
     timedNextItem ||
     scheduleItems.find((item) => String(item.status || "").toLowerCase() === "next") ||
     scheduleItems.find((item) => String(item.status || "").toLowerCase() === "upcoming") ||
-    scheduleItems[1] ||
     {}
   );
 }
 
-function getStartsInLabel(timeText) {
-  const match = String(timeText || "").match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+function getStartsInLabel(timeText, dateText = "") {
+  const target = parseScheduleDateTime({ date: dateText, start: timeText }, "start");
 
-  if (!match) {
+  if (!target) {
     return "Starts soon";
   }
 
-  const target = new Date();
-  let hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  const meridiem = match[3].toUpperCase();
-
-  if (meridiem === "PM" && hours !== 12) {
-    hours += 12;
-  }
-
-  if (meridiem === "AM" && hours === 12) {
-    hours = 0;
-  }
-
-  target.setHours(hours, minutes, 0, 0);
   const diffMinutes = Math.round((target.getTime() - Date.now()) / 60000);
 
   if (diffMinutes <= 0) {
@@ -1267,73 +1254,126 @@ function getStartsInLabel(timeText) {
     return `Starts in ${diffMinutes} minutes`;
   }
 
-  const hoursUntil = Math.floor(diffMinutes / 60);
+  const totalHours = Math.floor(diffMinutes / 60);
   const minutesUntil = diffMinutes % 60;
-  return `Starts in ${hoursUntil}h ${minutesUntil}m`;
+
+  if (totalHours < 24) {
+    return minutesUntil ? `Starts in ${totalHours}h ${minutesUntil}m` : `Starts in ${totalHours}h`;
+  }
+
+  const daysUntil = Math.floor(totalHours / 24);
+  const hoursUntil = totalHours % 24;
+  return hoursUntil ? `Starts in ${daysUntil}d ${hoursUntil}h` : `Starts in ${daysUntil}d`;
 }
 
-function renderPublicLocations() {
-  const now = new Date();
-  const scheduledLocations = Array.from(new Set(scheduleItems.map((item) => item.location).filter(Boolean)));
-  const baseLocations = ["Main Hall", "Sports Ground", "Classroom Block", "Dining Area", "Registration Desk", "Parking"];
-  const locations = Array.from(new Set([...scheduledLocations, ...baseLocations])).slice(0, 6).map((name) => {
-    const locationItems = scheduleItems.filter((item) => item.location === name);
-    const liveItem = locationItems.find((item) => {
-      const start = parseTodayTime(item.start);
-      const end = parseTodayTime(item.end);
-      return start && end && start.getTime() <= now.getTime() && end.getTime() > now.getTime();
-    });
-    const nextItem = locationItems
-      .map((item) => ({ ...item, startDate: parseTodayTime(item.start) }))
-      .filter((item) => item.startDate && item.startDate.getTime() > now.getTime())
-      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())[0];
+function getCountdownParts(item) {
+  const target = parseScheduleDateTime(item, "start");
+  if (!target) return null;
+  const diffMs = target.getTime() - Date.now();
+  if (diffMs <= 0) return null;
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  return { days, hours, minutes };
+}
 
-    if (liveItem) {
-      return [name, "Live Now", liveItem.title, "orange", "award"];
-    }
+let documents = [
+  { key: "syllabus", uploaded: false },
+  { key: "sports-package", uploaded: false },
+];
 
-    if (nextItem) {
-      return [name, getTimeUntilLabel(nextItem.start, "Starting soon"), nextItem.title, "blue", "calendar"];
-    }
+const documentMeta = {
+  syllabus: { title: "Ijtima Syllabus", description: "Full program and schedule booklet for the Ijtima.", icon: "file" },
+  "sports-package": { title: "Sports Package", description: "Rules, fixtures, and team information for sports competitions.", icon: "trophy" },
+};
 
-    if (name === "Registration Desk") {
-      return [name, "Open", "Badge collection", "teal", "user"];
-    }
+function formatFileSize(bytes) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
-    if (name === "Parking") {
-      return [name, "Available", "Parking area", "teal", "map"];
-    }
-
-    return [name, "Available", locationItems[0]?.title || "Event location", "teal", "map"];
-  });
-
+function renderPublicDocuments() {
   return `
-    <div class="location-grid">
-      ${locations
-        .map(
-          ([name, status, detail, tone, icon]) => `
-            <a class="location-card widget-nav-link" href="#public-locations" data-section="Locations">
-              <span class="location-icon">${iconSvg(icon)}</span>
-              <strong>${name}</strong>
-              <em class="${tone}">${status}</em>
-              <small>${detail}</small>
-              <span class="location-arrow">›</span>
-            </a>
-          `
-        )
-        .join("")}
+    <div class="documents-grid" id="public-documents">
+      ${documents.map((doc) => {
+        const meta = documentMeta[doc.key];
+        return `
+          <div class="document-card">
+            <div class="document-icon">${iconSvg(meta.icon)}</div>
+            <div class="document-info">
+              <strong>${meta.label || meta.title}</strong>
+              <p>${meta.description}</p>
+              ${doc.uploaded && doc.updatedAt ? `<small class="document-meta">Updated ${new Date(doc.updatedAt).toLocaleDateString()}</small>` : ""}
+            </div>
+            ${doc.uploaded && doc.url
+              ? `<div class="document-actions">
+                   <a class="primary-button compact" href="${doc.url}" target="_blank" rel="noopener">View PDF</a>
+                 </div>`
+              : `<div class="document-actions"><span class="document-not-uploaded">Not uploaded yet</span></div>`}
+          </div>
+        `;
+      }).join("")}
     </div>
   `;
 }
 
+async function loadDocuments() {
+  try {
+    const data = await apiRequest("/api/documents");
+    if (data.documents) documents = data.documents;
+  } catch {}
+}
+
+function parseDateInput(dateText) {
+  const normalized = String(dateText || "").trim();
+
+  if (!normalized) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  }
+
+  const isoMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (isoMatch) {
+    return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+  }
+
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function parseTodayTime(timeText) {
+  return parseScheduleDateTime({ start: timeText }, "start");
+}
+
+function formatScheduleDate(dateText) {
+  const date = parseDateInput(dateText);
+
+  if (!date) {
+    return "Today";
+  }
+
+  return date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+}
+
+function parseScheduleDateTime(item, field = "start") {
+  const date = parseDateInput(item?.date);
+
+  if (!date) {
+    return null;
+  }
+
+  const timeText = item?.[field];
   const match = String(timeText || "").match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
 
   if (!match) {
     return null;
   }
 
-  const date = new Date();
   let hours = Number(match[1]);
   const minutes = Number(match[2]);
   const meridiem = match[3].toUpperCase();
@@ -1695,7 +1735,7 @@ function renderPublicHelp() {
         <span class="public-card-icon danger">${iconSvg("phone")}</span>
         <div>
           <h3>Emergency Contact</h3>
-          <strong>+1 xxx xxx xxxx</strong>
+          <strong>911</strong>
           <p>For urgent on-site assistance.</p>
         </div>
       </article>
@@ -1718,8 +1758,8 @@ function getLiveServiceItems(prayerTimes) {
   const prayerTimeline = getPrayerTimeline(prayerTimes);
   const lunchLive = scheduleItems.some((item) => {
     const title = `${item.title || ""} ${item.location || ""}`.toLowerCase();
-    const start = parseTodayTime(item.start);
-    const end = parseTodayTime(item.end);
+    const start = parseScheduleDateTime(item, "start");
+    const end = parseScheduleDateTime(item, "end");
     return title.includes("lunch") && start && end && start.getTime() <= now.getTime() && end.getTime() > now.getTime();
   });
 
@@ -1738,13 +1778,13 @@ function getLiveServiceItems(prayerTimes) {
     [
       "Food Service",
       lunchLive ? "Live" : foodItem ? "Scheduled" : "Open",
-      lunchLive ? `${foodItem?.title || "Meal service"} active` : foodItem ? `${foodItem.title} ${getTimeUntilLabel(foodItem.start, "soon")}` : "Dining support available",
+      lunchLive ? `${foodItem?.title || "Meal service"} active` : foodItem ? `${foodItem.title} ${getTimeUntilLabel(foodItem.start, "soon", foodItem.date)}` : "Dining support available",
       lunchLive ? "busy" : "open",
       "list",
     ],
     ["Program Desk", liveItem.title ? "Live" : "Open", liveItem.title ? `${liveItem.title} at ${liveItem.location}` : "Ready for program updates", liveItem.title ? "busy" : "open", "award"],
     ["Prayer Support", "Live", `Next ${prayerTimeline.nextPrayer?.name || "prayer"} ${prayerTimeline.nextPrayer?.time || ""}`, "open", "clock"],
-    ["Next Movement", nextItem.title ? "Soon" : "Open", nextItem.title ? `${nextItem.title} ${getTimeUntilLabel(nextItem.start, "soon")}` : "No upcoming item", nextItem.title ? "busy" : "open", "map"],
+    ["Next Movement", nextItem.title ? "Soon" : "Open", nextItem.title ? `${nextItem.title} ${getTimeUntilLabel(nextItem.start, "soon", nextItem.date)}` : "No upcoming item", nextItem.title ? "busy" : "open", "map"],
     ["Results Desk", resultsCount ? "Updated" : "Standby", `${resultsCount} posted result entries`, resultsCount ? "open" : "busy", "trophy"],
   ].slice(0, 4);
 }
@@ -1804,15 +1844,46 @@ function renderPublicOverview() {
   const helpDeskLocation = getHelpDeskLocation();
 
   return `
-    <section class="public-live-card" id="public-live-now">
-      <div class="live-now-chip">${liveItem.title ? "Live Now" : "Standby"}</div>
-      <div>
-        <h2>${liveItem.title || "Program updates pending"}</h2>
-        <p>${liveItem.location || "Main Hall"}</p>
-        <strong>${liveItem.start || "--"} - ${liveItem.end || "--"}</strong>
-      </div>
-      <a class="primary-button compact widget-nav-link" href="#public-locations" data-section="Locations">View Location</a>
-    </section>
+    ${(() => {
+      if (liveItem.title) {
+        return `
+          <section class="public-live-card is-live" id="public-live-now">
+            <div class="live-now-chip">Live Now</div>
+            <div>
+              <h2>${liveItem.title}</h2>
+              <p>${liveItem.location || "Main Hall"}</p>
+              <strong>${liveItem.start || "--"} - ${liveItem.end || "--"}</strong>
+            </div>
+            <a class="primary-button compact widget-nav-link" href="#public-schedule" data-section="Schedule">View Schedule</a>
+          </section>`;
+      }
+      const countdown = nextItem.title ? getCountdownParts(nextItem) : null;
+      if (countdown) {
+        const parts = [
+          countdown.days > 0 ? `<div class="countdown-unit"><strong>${countdown.days}</strong><span>day${countdown.days !== 1 ? "s" : ""}</span></div>` : "",
+          `<div class="countdown-unit"><strong>${String(countdown.hours).padStart(2, "0")}</strong><span>hrs</span></div>`,
+          `<div class="countdown-unit"><strong>${String(countdown.minutes).padStart(2, "0")}</strong><span>min</span></div>`,
+        ].join('<div class="countdown-sep">:</div>');
+        return `
+          <section class="public-live-card is-countdown" id="public-live-now">
+            <div class="live-now-chip countdown-chip">Starting Soon</div>
+            <div class="countdown-hero-body">
+              <p class="countdown-event-label">Next: <strong>${nextItem.title}</strong></p>
+              <div class="countdown-display">${parts}</div>
+              <p class="countdown-event-meta">${formatScheduleDate(nextItem.date)} &bull; ${nextItem.start || "--"}</p>
+            </div>
+            <a class="primary-button compact widget-nav-link" href="#public-schedule" data-section="Schedule">View Schedule</a>
+          </section>`;
+      }
+      return `
+        <section class="public-live-card" id="public-live-now">
+          <div class="live-now-chip">Standby</div>
+          <div>
+            <h2>Program updates pending</h2>
+            <p>Schedule will appear here when programs are added.</p>
+          </div>
+        </section>`;
+    })()}
 
     <section class="public-overview-grid">
       <article class="public-card next-program-card">
@@ -1822,12 +1893,12 @@ function renderPublicOverview() {
             <span class="public-kicker">Next Program</span>
             <h3>${nextItem.title || "Next Program"}</h3>
           </div>
-          <span class="starting-chip">${getTimeUntilLabel(nextItem.start, "Soon")}</span>
+          <span class="starting-chip">${getTimeUntilLabel(nextItem.start, "Soon", nextItem.date)}</span>
         </div>
         <div class="next-countdown">
           <div class="countdown-copy">
             <span>${iconSvg("clock")} Starts in</span>
-            <strong>${getStartsInLabel(nextItem.start).replace("Starts in ", "").replace("Starting soon", "Soon")}</strong>
+            <strong>${getStartsInLabel(nextItem.start, nextItem.date).replace("Starts in ", "").replace("Starting soon", "Soon")}</strong>
           </div>
           <div class="trophy-illustration" aria-hidden="true">
             ${iconSvg("trophy")}
@@ -1868,17 +1939,31 @@ function renderPublicOverview() {
         <a class="announcement-view-all widget-nav-link" href="#public-announcements" data-section="Announcements">View all announcements <span>-></span></a>
       </article>
 
-      <article class="public-card public-locations-card" id="public-locations">
+      <article class="public-card public-locations-card" id="public-documents-widget">
         <div class="public-widget-heading">
-          <span class="public-card-icon teal">${iconSvg("map")}</span>
+          <span class="public-card-icon teal">${iconSvg("file")}</span>
           <div>
-            <h3>Location Quick Links</h3>
-            <p>Find important places around the event</p>
+            <h3>Documents</h3>
+            <p>Ijtima Syllabus &amp; Sports Package</p>
           </div>
-          <a class="soft-action widget-nav-link" href="#public-locations" data-section="Locations">${iconSvg("map")} Maps soon <span>-></span></a>
+          <a class="soft-action widget-nav-link" href="#public-documents" data-section="Documents">${iconSvg("file")} View all <span>-></span></a>
         </div>
-        ${renderPublicLocations()}
-        <a class="wide-soft-action widget-nav-link" href="#public-locations" data-section="Locations">${iconSvg("map")} View all locations on map <span>-></span></a>
+        <div class="documents-grid">
+          ${documents.map((doc) => {
+            const meta = documentMeta[doc.key];
+            return `
+              <div class="document-card">
+                <div class="document-icon">${iconSvg(meta.icon)}</div>
+                <div class="document-info">
+                  <strong>${meta.title}</strong>
+                  <p>${meta.description}</p>
+                </div>
+                ${doc.uploaded && doc.url
+                  ? `<div class="document-actions"><a class="primary-button compact" href="${doc.url}" target="_blank" rel="noopener">View PDF</a></div>`
+                  : `<div class="document-actions"><span class="document-not-uploaded">Not uploaded yet</span></div>`}
+              </div>`;
+          }).join("")}
+        </div>
       </article>
 
       <article class="public-card prayer-card" id="public-prayer-times">
@@ -1955,37 +2040,6 @@ function renderPublicOverview() {
         <a class="wide-soft-action widget-nav-link" href="#public-weather" data-scroll-target="public-weather">${iconSvg("alert")} View full forecast <span>-></span></a>
       </article>
 
-      <article class="public-card emergency-card" id="public-emergency">
-        <span class="emergency-hero-icon">${iconSvg("phone")}</span>
-        <div class="emergency-content">
-          <div class="emergency-heading">
-            <div>
-              <h3>Emergency Information</h3>
-              <p>For any urgent assistance</p>
-            </div>
-            <span>Important</span>
-          </div>
-          <div class="emergency-action-grid">
-            <div class="emergency-action-card">
-              <span>${iconSvg("phone")}</span>
-              <div>
-                <p>Emergency Contact</p>
-                <strong>+1 XXX XXX XXXX</strong>
-              </div>
-              <a class="widget-nav-link" href="tel:+1-000-000-0000">${iconSvg("phone")} Call Now</a>
-            </div>
-            <div class="emergency-action-card">
-              <span>${iconSvg("map")}</span>
-              <div>
-                <p>Help Desk</p>
-                <strong>${helpDeskLocation}</strong>
-              </div>
-              <a class="widget-nav-link" href="#public-locations" data-section="Locations">${iconSvg("map")} Get Directions</a>
-            </div>
-          </div>
-          <div class="emergency-availability">${iconSvg("clock")} Available 24/7 during the event</div>
-        </div>
-      </article>
     </section>
 
   `;
@@ -3333,18 +3387,18 @@ function renderAttendanceIssues() {
 function getLiveScheduleItem() {
   const now = new Date();
   const timedLiveItem = scheduleItems.find((item) => {
-    const start = parseTodayTime(item.start);
-    const end = parseTodayTime(item.end);
+    const start = parseScheduleDateTime(item, "start");
+    const end = parseScheduleDateTime(item, "end");
     return start && end && start.getTime() <= now.getTime() && end.getTime() > now.getTime();
   });
 
-  return timedLiveItem || scheduleItems.find((item) => String(item.status || "").toLowerCase() === "live") || scheduleItems[0] || {};
+  return timedLiveItem || scheduleItems.find((item) => String(item.status || "").toLowerCase() === "live") || {};
 }
 
 function getNextScheduleItem() {
   const now = new Date();
   const timedNextItem = scheduleItems
-    .map((item) => ({ ...item, startDate: parseTodayTime(item.start) }))
+    .map((item) => ({ ...item, startDate: parseScheduleDateTime(item, "start") }))
     .filter((item) => item.startDate && item.startDate.getTime() > now.getTime())
     .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())[0];
 
@@ -3352,7 +3406,6 @@ function getNextScheduleItem() {
     timedNextItem ||
     scheduleItems.find((item) => String(item.status || "").toLowerCase() === "next") ||
     scheduleItems.find((item) => String(item.status || "").toLowerCase() === "upcoming") ||
-    scheduleItems[1] ||
     {}
   );
 }
@@ -3362,8 +3415,7 @@ function getRegistrationRows() {
 
   return memberRecords.filter((member) => {
     const matchesHalqa = registrationHalqaFilter === "All" || member.halqa === registrationHalqaFilter;
-    const present = isMemberPresent(member);
-    const statusLabel = present ? "Present" : "Pending";
+    const statusLabel = member.registered ? "Registered" : "Not Registered";
     const matchesStatus = registrationStatusFilter === "All" || registrationStatusFilter === statusLabel;
     const matchesQuery =
       !query ||
@@ -3574,9 +3626,9 @@ function renderAdminRegistrations() {
             </select>
           </label>
           <label class="search-field">
-            <span>Attendance Status</span>
+            <span>Registration Status</span>
             <select id="registrationStatusFilter">
-              ${["All", "Present", "Pending"]
+              ${["All", "Registered", "Not Registered"]
                 .map((s) => `<option ${registrationStatusFilter === s ? "selected" : ""}>${s}</option>`)
                 .join("")}
             </select>
@@ -4605,6 +4657,41 @@ function getRoleCounts() {
   }, {});
 }
 
+function renderAdminDocuments() {
+  return `
+    <div class="admin-documents-shell">
+      <p class="admin-documents-hint">Upload your PDFs to <strong>Google Drive</strong>, set sharing to <em>"Anyone with the link can view"</em>, then paste the link below.</p>
+      ${documents.map((doc) => {
+        const meta = documentMeta[doc.key];
+        return `
+          <div class="admin-document-row">
+            <div class="admin-document-info">
+              <strong>${meta.title}</strong>
+              ${doc.uploaded
+                ? `<span class="pill pill-success">Link saved</span>`
+                : `<span class="pill pill-muted">No link yet</span>`}
+              <p>${meta.description}</p>
+            </div>
+            <form class="admin-doc-link-form" data-key="${doc.key}">
+              <input
+                class="admin-doc-url-input"
+                type="url"
+                name="url"
+                placeholder="Paste Google Drive link…"
+                value="${doc.url || ""}"
+                required
+              />
+              <button class="primary-button compact" type="submit">Save Link</button>
+              ${doc.uploaded ? `<a class="secondary-button compact" href="${doc.url}" target="_blank" rel="noopener">View</a>` : ""}
+              ${doc.uploaded ? `<button class="danger-button compact admin-doc-delete" data-key="${doc.key}" type="button">Remove</button>` : ""}
+            </form>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function renderAdminUsers() {
   const rows = getAdminUserRows();
   const roleCounts = getRoleCounts();
@@ -5553,8 +5640,12 @@ function renderSportsCeremonySheet() {
 }
 
 function getComputedScheduleStatus(item, nextRowId = "") {
-  const start = parseTodayTime(item.start);
-  const end = parseTodayTime(item.end);
+  if (item.status && item.status !== "Auto") {
+    return item.status;
+  }
+
+  const start = parseScheduleDateTime(item, "start");
+  const end = parseScheduleDateTime(item, "end");
   const now = new Date();
 
   if (start && end) {
@@ -5573,13 +5664,13 @@ function getComputedScheduleStatus(item, nextRowId = "") {
     return "Upcoming";
   }
 
-  return item.status || "Upcoming";
+  return "Upcoming";
 }
 
 function getNextScheduleRowId() {
   const now = new Date();
   const nextItem = scheduleItems
-    .map((item, index) => ({ item, index, startDate: parseTodayTime(item.start) }))
+    .map((item, index) => ({ item, index, startDate: parseScheduleDateTime(item, "start") }))
     .filter((entry) => entry.startDate && entry.startDate.getTime() > now.getTime())
     .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())[0];
 
@@ -5600,8 +5691,8 @@ function getScheduleStats() {
 }
 
 function getScheduleOverlaps(candidate, candidateRowId = "") {
-  const candidateStart = parseTodayTime(candidate.start);
-  const candidateEnd = parseTodayTime(candidate.end);
+  const candidateStart = parseScheduleDateTime(candidate, "start");
+  const candidateEnd = parseScheduleDateTime(candidate, "end");
 
   if (!candidateStart || !candidateEnd || candidateEnd.getTime() <= candidateStart.getTime()) {
     return [];
@@ -5609,8 +5700,8 @@ function getScheduleOverlaps(candidate, candidateRowId = "") {
 
   return scheduleItems.filter((item, index) => {
     const rowId = getRowId(item, index);
-    const start = parseTodayTime(item.start);
-    const end = parseTodayTime(item.end);
+    const start = parseScheduleDateTime(item, "start");
+    const end = parseScheduleDateTime(item, "end");
 
     if (rowId === candidateRowId || !start || !end) {
       return false;
@@ -5622,6 +5713,7 @@ function getScheduleOverlaps(candidate, candidateRowId = "") {
 
 function renderAdminSchedulePreview(item) {
   const previewItem = {
+    date: item?.date || new Date().toISOString().slice(0, 10),
     start: item?.start || "02:00 PM",
     end: item?.end || "02:45 PM",
     title: item?.title || "Final Session",
@@ -5634,7 +5726,7 @@ function renderAdminSchedulePreview(item) {
     <div class="schedule-public-preview" id="schedulePreviewBox" aria-label="Public preview">
       <span class="public-kicker">Public Preview</span>
       <strong>${previewItem.title}</strong>
-      <p>${previewItem.start} - ${previewItem.end}</p>
+      <p>${formatScheduleDate(previewItem.date)} - ${previewItem.start} - ${previewItem.end}</p>
       <p>${previewItem.location} - ${previewItem.lead}</p>
       <span class="pill ${status === "Live" ? "pill-success" : "pill-muted"}">${status}</span>
     </div>
@@ -5648,6 +5740,7 @@ function renderAdminScheduleManager() {
   const stats = getScheduleStats();
   const liveItem = scheduleItems.find((item) => getComputedScheduleStatus(item, getNextScheduleRowId()) === "Live");
   const overlaps = editingItem ? getScheduleOverlaps(editingItem, editingScheduleRow) : [];
+  const selectedStatus = editingItem?.status || "Auto";
   const templates = [
     ["Tilawat", "Tilawat & Nazm", "Main Hall", "Education Team", "09:30 AM", "10:15 AM"],
     ["Nazm", "Nazm", "Main Hall", "Education Team", "10:15 AM", "10:30 AM"],
@@ -5675,7 +5768,7 @@ function renderAdminScheduleManager() {
         <div class="schedule-editor-pane">
           <div class="admin-subsection-heading">
             <h3>${editingItem ? "Edit Program" : "Add Program"}</h3>
-            <span>Auto-status from time</span>
+            <span>Status can be updated manually</span>
           </div>
 
           <div class="template-row" aria-label="Quick schedule templates">
@@ -5689,7 +5782,10 @@ function renderAdminScheduleManager() {
           </div>
 
           <form class="manager-form schedule-manager-form" id="scheduleForm">
-            <input type="hidden" name="status" value="${editingItem ? getComputedScheduleStatus(editingItem) : "Upcoming"}" />
+            <label class="field">
+              <span>Date</span>
+              <input type="date" name="date" value="${editingItem?.date || new Date().toISOString().slice(0, 10)}" required />
+            </label>
             <div class="form-grid">
               <label class="field">
                 <span>Starts</span>
@@ -5720,8 +5816,16 @@ function renderAdminScheduleManager() {
                 <span>Lead</span>
                 <input name="lead" value="${editingItem?.lead || ""}" placeholder="Program Team" required />
               </label>
+              <label class="field">
+                <span>Status</span>
+                <select name="status">
+                  ${["Auto", "Upcoming", "Next", "Live", "Completed"]
+                    .map((status) => `<option value="${status}" ${selectedStatus === status ? "selected" : ""}>${status}</option>`)
+                    .join("")}
+                </select>
+              </label>
             </div>
-            <div class="auto-status-note">Status is calculated automatically from start/end time.</div>
+            <div class="auto-status-note">Use Auto for time-based status, or choose a status when a program overruns or changes.</div>
             ${overlaps.length ? `<div class="schedule-warning">Time overlaps with: ${overlaps.map((item) => item.title).join(", ")}</div>` : ""}
             ${renderAdminSchedulePreview(editingItem)}
             <div class="form-actions">
@@ -5895,7 +5999,7 @@ function getRowId(item, index) {
 function renderAdminScheduleList() {
   const nextRowId = getNextScheduleRowId();
   const sortedItems = scheduleItems
-    .map((item, index) => ({ item, index, startDate: parseTodayTime(item.start) }))
+    .map((item, index) => ({ item, index, startDate: parseScheduleDateTime(item, "start") }))
     .sort((a, b) => {
       if (a.startDate && b.startDate) {
         return a.startDate.getTime() - b.startDate.getTime();
@@ -5907,7 +6011,7 @@ function renderAdminScheduleList() {
   return `
     <div class="admin-subsection schedule-timeline-admin">
       <div class="admin-subsection-heading">
-        <h3>Today's Schedule</h3>
+        <h3>Schedule</h3>
         <span>${scheduleItems.length} programs</span>
       </div>
       <div class="admin-schedule-timeline" aria-label="Editable schedule timeline">
@@ -5920,6 +6024,7 @@ function renderAdminScheduleList() {
             return `
               <article class="admin-schedule-row status-${status.toLowerCase()}">
                 <div class="admin-schedule-time">
+                  <span>${formatScheduleDate(item.date)}</span>
                   <strong>${item.start || "-"}</strong>
                   <span>${item.end || "-"}</span>
                 </div>
@@ -5930,6 +6035,8 @@ function renderAdminScheduleList() {
                 </div>
                 <span class="pill ${pillClass}">${status}</span>
                 <span class="row-actions">
+                  ${status !== "Live" && status !== "Completed" ? `<button class="success-button go-live-schedule-item" data-row="${rowId}" type="button">Go Live</button>` : ""}
+                  ${status === "Live" ? `<button class="secondary-button end-now-schedule-item" data-row="${rowId}" type="button">End Now</button>` : ""}
                   <button class="secondary-button edit-schedule-item" data-row="${rowId}" type="button">Edit</button>
                   <button class="danger-button delete-schedule-item" data-row="${rowId}" type="button">Delete</button>
                 </span>
@@ -6072,8 +6179,8 @@ function renderPanels(role) {
             return role === "admin" ? panel.title === "Admin Competitions" : panel.title === "Competition Positions";
           }
 
-          if (currentSection === "Locations") {
-            return panel.title === "Location Quick Links";
+          if (currentSection === "Documents") {
+            return role === "admin" ? panel.title === "Admin Documents" : panel.title === "Documents";
           }
 
           if (currentSection === "Help") {
@@ -6087,6 +6194,7 @@ function renderPanels(role) {
           if (currentSection === "Users") {
             return panel.title === "Admin Users";
           }
+
 
           if (currentSection === "Announcements") {
             return panel.title === "Announcements" || panel.title === "Announcement Manager";
@@ -6213,7 +6321,7 @@ function renderPanels(role) {
 
     const scheduleMarkup = panel.title === "Live Schedule" ? renderSchedule() : "";
     const announcementMarkup = panel.title === "Announcements" ? renderAnnouncements() : "";
-    const publicLocationsMarkup = panel.title === "Location Quick Links" && role === "public" ? renderPublicLocations() : "";
+    const publicDocumentsMarkup = panel.title === "Documents" && role === "public" ? renderPublicDocuments() : "";
     const publicHelpMarkup = panel.title === "Help & Emergency" && role === "public" ? renderPublicHelp() : "";
     const rankingsMarkup = panel.title === "Halqa Position Report" ? renderHalqaRankings() : "";
     const competitionMarkup = panel.title === "Competition Positions" ? renderCompetitionResults() : "";
@@ -6238,6 +6346,7 @@ function renderPanels(role) {
     const adminCompetitionsMarkup =
       panel.title === "Admin Competitions" && role === "admin" ? renderAdminCompetitions() : "";
     const adminUsersMarkup = panel.title === "Admin Users" && role === "admin" ? renderAdminUsers() : "";
+    const adminDocumentsMarkup = panel.title === "Admin Documents" && role === "admin" ? renderAdminDocuments() : "";
     const eduFinalMarkup =
       panel.title === "Final Positions" && role === "educationJudge" ? renderFinalPositionsManager("Education") : "";
     const sportsFinalMarkup =
@@ -6245,11 +6354,11 @@ function renderPanels(role) {
 
     article.innerHTML = `
       <h2>${panel.title}</h2>
-      <p>${panel.body}</p>
+      ${panel.body ? `<p>${panel.body}</p>` : ""}
       ${metricMarkup}
       ${scheduleMarkup}
       ${announcementMarkup}
-      ${publicLocationsMarkup}
+      ${publicDocumentsMarkup}
       ${publicHelpMarkup}
       ${rankingsMarkup}
       ${competitionMarkup}
@@ -6264,6 +6373,7 @@ function renderPanels(role) {
       ${adminAttendanceReportsMarkup}
       ${adminCompetitionsMarkup}
       ${adminUsersMarkup}
+      ${adminDocumentsMarkup}
       ${eduFinalMarkup}
       ${sportsFinalMarkup}
       ${halqaNote}
@@ -6856,13 +6966,15 @@ function bindDynamicControls() {
     const box = document.querySelector("#schedulePreviewBox");
     if (!box || !form) return;
     const title = form.elements.title?.value || "Program Name";
+    const date = form.elements.date?.value || new Date().toISOString().slice(0, 10);
     const start12 = to12h(form.elements.start?.value) || "Start";
     const end12 = to12h(form.elements.end?.value) || "End";
     const loc = form.elements.location?.value || "Location";
     const lead = form.elements.lead?.value || "Lead";
-    const status = getComputedScheduleStatus({ start: start12, end: end12, title, location: loc, lead });
+    const selectedStatus = form.elements.status?.value || "Auto";
+    const status = getComputedScheduleStatus({ date, start: start12, end: end12, title, location: loc, lead, status: selectedStatus });
     box.querySelector("strong").textContent = title;
-    box.querySelectorAll("p")[0].textContent = `${start12} - ${end12}`;
+    box.querySelectorAll("p")[0].textContent = `${formatScheduleDate(date)} - ${start12} - ${end12}`;
     box.querySelectorAll("p")[1].textContent = `${loc} - ${lead}`;
     const pill = box.querySelector(".pill");
     pill.className = `pill ${status === "Live" ? "pill-success" : "pill-muted"}`;
@@ -6877,16 +6989,13 @@ function bindDynamicControls() {
       const formData = new FormData(scheduleForm);
       const scheduleItem = {
         rowId: editingScheduleRow,
+        date: formData.get("date"),
         start: to12h(formData.get("start")),
         end: to12h(formData.get("end")),
         title: formData.get("title"),
         location: formData.get("location"),
         lead: formData.get("lead"),
-        status: getComputedScheduleStatus({
-          start: to12h(formData.get("start")),
-          end: to12h(formData.get("end")),
-          status: formData.get("status"),
-        }),
+        status: formData.get("status") || "Auto",
       };
       const overlaps = getScheduleOverlaps(scheduleItem, editingScheduleRow || "");
 
@@ -6934,6 +7043,7 @@ function bindDynamicControls() {
       form.elements.lead.value = button.dataset.lead || "";
       form.elements.start.value = to24h(button.dataset.start || "");
       form.elements.end.value = to24h(button.dataset.end || "");
+      form.elements.status.value = "Auto";
 
       document.querySelectorAll(".template-chip").forEach((c) => c.classList.remove("is-active"));
       button.classList.add("is-active");
@@ -7098,6 +7208,88 @@ function bindDynamicControls() {
         editingScheduleRow = null;
       }
       renderDashboard(currentRole);
+    });
+  });
+
+  document.querySelectorAll(".go-live-schedule-item").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const rowId = button.dataset.row;
+      const item = scheduleItems.find((s, i) => getRowId(s, i) === rowId);
+      if (!item) return;
+      scheduleItems.forEach((s, i) => {
+        if (String(s.status || "").toLowerCase() === "live") {
+          s.status = "Completed";
+        }
+      });
+      try {
+        const data = await apiRequest("/api/admin/schedule/update", {
+          method: "POST",
+          body: JSON.stringify({ ...item, rowId, status: "Live" }),
+        });
+        scheduleItems = data.scheduleItems;
+      } catch (error) {
+        const idx = scheduleItems.findIndex((s, i) => getRowId(s, i) === rowId);
+        if (idx >= 0) scheduleItems[idx] = { ...scheduleItems[idx], status: "Live" };
+      }
+      renderDashboard(currentRole);
+    });
+  });
+
+  document.querySelectorAll(".end-now-schedule-item").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const rowId = button.dataset.row;
+      const item = scheduleItems.find((s, i) => getRowId(s, i) === rowId);
+      if (!item) return;
+      try {
+        const data = await apiRequest("/api/admin/schedule/update", {
+          method: "POST",
+          body: JSON.stringify({ ...item, rowId, status: "Completed" }),
+        });
+        scheduleItems = data.scheduleItems;
+      } catch (error) {
+        const idx = scheduleItems.findIndex((s, i) => getRowId(s, i) === rowId);
+        if (idx >= 0) scheduleItems[idx] = { ...scheduleItems[idx], status: "Completed" };
+      }
+      renderDashboard(currentRole);
+    });
+  });
+
+  document.querySelectorAll(".admin-doc-link-form").forEach((form) => {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const key = form.dataset.key;
+      const url = form.elements.url.value.trim();
+      const submitBtn = form.querySelector("[type=submit]");
+      submitBtn.textContent = "Saving…";
+      submitBtn.disabled = true;
+      try {
+        const data = await apiRequest("/api/documents/save", {
+          method: "POST",
+          body: JSON.stringify({ key, url }),
+        });
+        const idx = documents.findIndex((d) => d.key === key);
+        if (idx >= 0) documents[idx] = { ...documents[idx], ...data };
+        renderDashboard(currentRole);
+      } catch {
+        submitBtn.textContent = "Save Link";
+        submitBtn.disabled = false;
+        alert("Failed to save. Please try again.");
+      }
+    });
+  });
+
+  document.querySelectorAll(".admin-doc-delete").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const key = btn.dataset.key;
+      if (!confirm("Remove this link? Public users will no longer see this document.")) return;
+      try {
+        await apiRequest("/api/documents/delete", { method: "POST", body: JSON.stringify({ key }) });
+        const idx = documents.findIndex((d) => d.key === key);
+        if (idx >= 0) documents[idx] = { key, uploaded: false };
+        renderDashboard(currentRole);
+      } catch {
+        alert("Delete failed. Please try again.");
+      }
     });
   });
 
@@ -7615,24 +7807,27 @@ function updateAnnouncementPreview() {
   }
 }
 
+let _renderPending = false;
+let _renderRole = null;
+
 function renderDashboard(role) {
-  currentRole = role;
-  appShell?.classList.toggle("is-sidebar-collapsed", isSidebarCollapsed);
-  sidebarToggle?.setAttribute("aria-label", isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar");
-  pageTitle.textContent = roleLabels[role];
-  sessionLabel.textContent = currentUser ? "Signed in as" : "Public view";
-  signedInUser.textContent = currentUser ? `${currentUser.name} - ${currentUser.access}` : "General User";
-  loginButton.hidden = Boolean(currentUser);
-  logoutButton.hidden = !currentUser;
-  renderNav(role);
-  renderPanels(role);
+  _renderRole = role;
+  if (_renderPending) return;
+  _renderPending = true;
+  requestAnimationFrame(() => {
+    _renderPending = false;
+    const r = _renderRole;
+    currentRole = r;
+    pageTitle.textContent = roleLabels[r];
+    sessionLabel.textContent = currentUser ? "Signed in as" : "Public view";
+    signedInUser.textContent = currentUser ? `${currentUser.name} - ${currentUser.access}` : "General User";
+    loginButton.hidden = Boolean(currentUser);
+    logoutButton.hidden = !currentUser;
+    renderNav(r);
+    renderPanels(r);
+  });
 }
 
-sidebarToggle?.addEventListener("click", () => {
-  isSidebarCollapsed = !isSidebarCollapsed;
-  appShell?.classList.toggle("is-sidebar-collapsed", isSidebarCollapsed);
-  sidebarToggle.setAttribute("aria-label", isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar");
-});
 
 function isEditingForm() {
   const activeElement = document.activeElement;
@@ -7651,12 +7846,15 @@ function startLiveRefresh() {
 
     try {
       const data = await apiRequest("/api/bootstrap");
+      const snapshot = JSON.stringify(data);
+      if (snapshot === liveRefreshTimer._lastSnapshot) return;
+      liveRefreshTimer._lastSnapshot = snapshot;
       applyBootstrapData(data);
       renderDashboard(currentRole);
     } catch (error) {
       // Keep the current screen if the backend is temporarily unavailable.
     }
-  }, 10000);
+  }, 30000);
 }
 
 function startPrayerClock() {
@@ -7747,6 +7945,8 @@ async function initializeApp() {
     loadEducationRubricsFromStorage();
     console.warn("Backend bootstrap unavailable. Using local sample data.");
   }
+
+  await loadDocuments();
 
   const saved = localStorage.getItem("dashboardSession");
   if (saved) {

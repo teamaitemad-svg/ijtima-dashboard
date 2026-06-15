@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 const {
   appendAnnouncement,
   appendAttendance,
@@ -469,6 +470,7 @@ async function handleApi(request, response, url) {
     }
 
     const scheduleItem = {
+      date: body.date,
       start: body.start,
       end: body.end,
       title: body.title,
@@ -927,8 +929,69 @@ async function handleApi(request, response, url) {
     return true;
   }
 
+  const DOCUMENTS_FILE = path.join(PUBLIC_DIR, "documents.json");
+  const ALLOWED_DOCUMENT_KEYS = ["syllabus", "sports-package"];
+
+  function readDocumentsFile() {
+    try {
+      return JSON.parse(fs.readFileSync(DOCUMENTS_FILE, "utf8"));
+    } catch {
+      return {};
+    }
+  }
+
+  function writeDocumentsFile(data) {
+    fs.writeFileSync(DOCUMENTS_FILE, JSON.stringify(data, null, 2), "utf8");
+  }
+
+  if (request.method === "GET" && requestPath === "/api/documents") {
+    const stored = readDocumentsFile();
+    const docs = ALLOWED_DOCUMENT_KEYS.map((key) => {
+      const entry = stored[key];
+      return entry ? { key, uploaded: true, url: entry.url, label: entry.label, updatedAt: entry.updatedAt } : { key, uploaded: false };
+    });
+    sendJson(response, 200, { documents: docs });
+    return true;
+  }
+
+  if (request.method === "POST" && requestPath === "/api/documents/save") {
+    const body = await readJson(request);
+    const key = String(body.key || "").trim();
+    const url = String(body.url || "").trim();
+    const label = String(body.label || "").trim();
+    if (!ALLOWED_DOCUMENT_KEYS.includes(key)) {
+      sendError(response, 400, "Unknown document key.");
+      return true;
+    }
+    if (!url) {
+      sendError(response, 400, "URL is required.");
+      return true;
+    }
+    const stored = readDocumentsFile();
+    stored[key] = { url, label, updatedAt: Date.now() };
+    writeDocumentsFile(stored);
+    sendJson(response, 200, { key, uploaded: true, url, label, updatedAt: stored[key].updatedAt });
+    return true;
+  }
+
+  if (request.method === "POST" && requestPath === "/api/documents/delete") {
+    const body = await readJson(request);
+    const key = String(body.key || "").trim();
+    if (!ALLOWED_DOCUMENT_KEYS.includes(key)) {
+      sendError(response, 400, "Unknown document key.");
+      return true;
+    }
+    const stored = readDocumentsFile();
+    delete stored[key];
+    writeDocumentsFile(stored);
+    sendJson(response, 200, { key, uploaded: false });
+    return true;
+  }
+
   return false;
 }
+
+const staticCache = new Map();
 
 function serveStatic(request, response, url) {
   const requestPath = resolveRequestPath(url.pathname);
@@ -946,22 +1009,75 @@ function serveStatic(request, response, url) {
     return;
   }
 
-  fs.readFile(filePath, (error, content) => {
+  const extension = path.extname(filePath).toLowerCase();
+  const contentTypes = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+  };
+  const contentType = contentTypes[extension] || "application/octet-stream";
+  const isCompressible = [".html", ".css", ".js", ".json"].includes(extension);
+  const acceptsGzip = (request.headers["accept-encoding"] || "").includes("gzip");
+  const useGzip = isCompressible && acceptsGzip;
+  const cacheKey = filePath + (useGzip ? ":gz" : "");
+
+  if (staticCache.has(cacheKey)) {
+    const { content, etag } = staticCache.get(cacheKey);
+    if (request.headers["if-none-match"] === etag) {
+      response.writeHead(304);
+      response.end();
+      return;
+    }
+    const headers = {
+      "Content-Type": contentType,
+      "Cache-Control": extension === ".html" ? "no-cache" : "public, max-age=3600",
+      "ETag": etag,
+    };
+    if (useGzip) headers["Content-Encoding"] = "gzip";
+    response.writeHead(200, headers);
+    response.end(content);
+    return;
+  }
+
+  fs.readFile(filePath, (error, raw) => {
     if (error) {
       sendError(response, 404, "Not found.");
       return;
     }
 
-    const extension = path.extname(filePath).toLowerCase();
-    const contentTypes = {
-      ".html": "text/html",
-      ".css": "text/css",
-      ".js": "text/javascript",
-      ".json": "application/json",
+    const etag = `"${raw.length}-${fs.statSync(filePath).mtimeMs}"`;
+
+    const serve = (content) => {
+      staticCache.set(cacheKey, { content, etag });
+      if (request.headers["if-none-match"] === etag) {
+        response.writeHead(304);
+        response.end();
+        return;
+      }
+      const headers = {
+        "Content-Type": contentType,
+        "Cache-Control": extension === ".html" ? "no-cache" : "public, max-age=3600",
+        "ETag": etag,
+      };
+      if (useGzip) headers["Content-Encoding"] = "gzip";
+      response.writeHead(200, headers);
+      response.end(content);
     };
 
-    response.writeHead(200, { "Content-Type": contentTypes[extension] || "application/octet-stream" });
-    response.end(content);
+    if (useGzip) {
+      zlib.gzip(raw, { level: 6 }, (err, compressed) => {
+        serve(err ? raw : compressed);
+      });
+    } else {
+      serve(raw);
+    }
   });
 }
 
