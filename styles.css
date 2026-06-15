@@ -944,8 +944,6 @@ a.wide-soft-action {
 
 .public-live-card.is-countdown {
   grid-template-columns: auto minmax(0, 1fr) auto;
-  background: linear-gradient(135deg, rgba(30, 58, 138, 0.95), rgba(37, 99, 235, 0.9)), #1e3a8a;
-  box-shadow: 0 24px 54px rgba(30, 58, 138, 0.26);
 }
 
 .countdown-chip::before {
@@ -5806,19 +5804,20 @@ a.wide-soft-action {
   .sidebar {
     position: fixed;
     top: 0;
-    left: -300px;
+    left: 0;
     width: 280px;
     height: 100vh;
     z-index: 200;
     border-right: 1px solid var(--line);
     border-bottom: 0;
     box-shadow: 4px 0 24px rgba(15, 23, 42, 0.12);
-    transition: left 0.25s ease;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
     overflow-y: auto;
   }
 
   .sidebar.is-open {
-    left: 0;
+    transform: translateX(0);
   }
 
   .sidebar-overlay.is-open {
@@ -5891,30 +5890,15 @@ a.wide-soft-action {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .public-live-card {
-    grid-template-columns: 1fr;
-  }
-
+  .public-live-card,
   .public-live-card.is-countdown {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 14px;
+    grid-template-columns: 1fr;
     padding: 20px;
   }
 
   .public-live-card.is-countdown .primary-button {
     width: 100%;
     text-align: center;
-    margin-top: 4px;
-  }
-
-  .countdown-display {
-    flex-wrap: wrap;
-  }
-
-  .countdown-unit {
-    min-width: 44px;
   }
 
   .countdown-unit strong {
