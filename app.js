@@ -50,6 +50,7 @@ let attendanceReportHalqaFilter = "All";
 let attendanceReportStatusFilter = "All";
 let attendanceReportPage = 1;
 let attendanceReportPerPage = 50;
+let announcementFilter = "all";
 let competitionAdminCategoryFilter = "All";
 let competitionAdminSearch = "";
 let competitionsList = [];
@@ -1190,11 +1191,9 @@ function renderAnnouncements() {
       </article>
 
       <div class="announcement-filter-row" aria-label="Announcement filters">
-        <span>All</span>
-        <span>Important</span>
-        <span>Sports</span>
-        <span>Registration</span>
-        <span>Facilities</span>
+        ${[["all", "All"], ["important", "Important"], ["sports", "Sports"], ["registration", "Registration"], ["facilities", "Facilities"]]
+          .map(([value, label]) => `<button class="${announcementFilter === value ? "is-active" : ""}" data-announcement-filter="${value}" type="button">${label}</button>`)
+          .join("")}
       </div>
 
       <div class="announcement-feed">
@@ -1203,6 +1202,11 @@ function renderAnnouncements() {
           <span>${importantItems.length} important • ${generalCount} general</span>
         </div>
       ${feedItems
+        .filter((item) => {
+          if (announcementFilter === "all") return true;
+          if (announcementFilter === "important") return item.pinned || String(item.priority || "").toLowerCase() === "critical";
+          return getAnnouncementCategory(item).toLowerCase() === announcementFilter;
+        })
         .map(
           (item) => {
             const meta = getAnnouncementPriorityMeta(item.priority);
@@ -7352,6 +7356,13 @@ function bindDynamicControls() {
   document.querySelector(".cancel-announcement-edit")?.addEventListener("click", () => {
     editingAnnouncementRow = null;
     renderDashboard(currentRole);
+  });
+
+  document.querySelectorAll("[data-announcement-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      announcementFilter = btn.dataset.announcementFilter;
+      renderDashboard(currentRole);
+    });
   });
 
   // Education setup and sports result forms no longer rendered — portals use finalPositionsManager now.

@@ -2950,7 +2950,7 @@ a.wide-soft-action {
   gap: 8px;
 }
 
-.announcement-filter-row span,
+.announcement-filter-row button,
 .category-tag,
 .new-dot {
   padding: 6px 9px;
@@ -2959,13 +2959,21 @@ a.wide-soft-action {
   font-weight: 900;
 }
 
-.announcement-filter-row span {
+.announcement-filter-row button {
   border: 1px solid var(--line);
   background: #fff;
   color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.announcement-filter-row span:first-child {
+.announcement-filter-row button:hover {
+  border-color: rgba(15, 118, 110, 0.3);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.announcement-filter-row button.is-active {
   border-color: rgba(15, 118, 110, 0.2);
   background: var(--accent-soft);
   color: var(--accent);
