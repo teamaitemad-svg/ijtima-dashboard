@@ -13,6 +13,27 @@ const navList = document.querySelector("#navList");
 const dashboardGrid = document.querySelector("#dashboardGrid");
 const pageTitle = document.querySelector("#pageTitle");
 
+const sidebar = document.querySelector("#sidebar");
+const sidebarOverlay = document.querySelector("#sidebarOverlay");
+const hamburgerBtn = document.querySelector("#hamburgerBtn");
+const sidebarCloseBtn = document.querySelector("#sidebarCloseBtn");
+
+function openMobileNav() {
+  sidebar.classList.add("is-open");
+  sidebarOverlay.classList.add("is-open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeMobileNav() {
+  sidebar.classList.remove("is-open");
+  sidebarOverlay.classList.remove("is-open");
+  document.body.style.overflow = "";
+}
+
+hamburgerBtn.addEventListener("click", openMobileNav);
+sidebarCloseBtn.addEventListener("click", closeMobileNav);
+sidebarOverlay.addEventListener("click", closeMobileNav);
+
 let currentUser = null;
 let currentRole = "public";
 let currentSection = "Overview";
@@ -878,6 +899,7 @@ function renderNav(role) {
       button.innerHTML = `${iconSvg(navIconMap[item])}<span>${item}</span>`;
     button.addEventListener("click", () => {
       currentSection = item;
+      closeMobileNav();
       renderDashboard(role);
     });
       section.append(button);
@@ -6408,6 +6430,7 @@ function bindDynamicControls() {
 
       if (isInternalSection) {
         currentSection = targetSection;
+        closeMobileNav();
         renderDashboard(currentRole);
         return;
       }
