@@ -1029,6 +1029,72 @@ a.wide-soft-action {
   color: rgba(255, 255, 255, 0.7) !important;
 }
 
+.live-events-list,
+.countdown-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.live-event-row,
+.countdown-event-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.live-event-title,
+.countdown-event-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+}
+
+.live-event-meta,
+.countdown-event-loc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.next-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.next-event-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel-strong);
+}
+
+.next-event-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.next-event-loc {
+  font-size: 13px;
+  color: var(--muted);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .public-overview-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -1249,6 +1249,18 @@ function getLiveScheduleItem() {
   return timedLiveItem || scheduleItems.find((item) => String(item.status || "").toLowerCase() === "live") || {};
 }
 
+function getLiveScheduleItems() {
+  const now = new Date();
+  const timed = scheduleItems.filter((item) => {
+    const start = parseScheduleDateTime(item, "start");
+    const end = parseScheduleDateTime(item, "end");
+    return start && end && start.getTime() <= now.getTime() && end.getTime() > now.getTime();
+  });
+  if (timed.length) return timed;
+  const manual = scheduleItems.filter((item) => String(item.status || "").toLowerCase() === "live");
+  return manual;
+}
+
 function getNextScheduleItem() {
   const now = new Date();
   const timedNextItem = scheduleItems
@@ -1262,6 +1274,24 @@ function getNextScheduleItem() {
     scheduleItems.find((item) => String(item.status || "").toLowerCase() === "upcoming") ||
     {}
   );
+}
+
+function getNextScheduleItems() {
+  const now = new Date();
+  const withDates = scheduleItems
+    .map((item) => ({ ...item, startDate: parseScheduleDateTime(item, "start") }))
+    .filter((item) => item.startDate && item.startDate.getTime() > now.getTime())
+    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
+  if (withDates.length === 0) {
+    const manual = scheduleItems.filter((item) => {
+      const s = String(item.status || "").toLowerCase();
+      return s === "next" || s === "upcoming";
+    });
+    return manual;
+  }
+  const earliest = withDates[0].startDate.getTime();
+  return withDates.filter((item) => item.startDate.getTime() === earliest);
 }
 
 function getStartsInLabel(timeText, dateText = "") {
@@ -1857,7 +1887,9 @@ function getLiveHighlights() {
 
 function renderPublicOverview() {
   const liveItem = getLiveScheduleItem();
+  const liveItems = getLiveScheduleItems();
   const nextItem = getNextScheduleItem();
+  const nextItems = getNextScheduleItems();
   const importantAnnouncements = announcements.slice(0, 2);
   const importantAnnouncementCount = announcements.filter((item) => {
     const priority = String(item.priority || "").toLowerCase();
@@ -1872,32 +1904,38 @@ function renderPublicOverview() {
 
   return `
     ${(() => {
-      if (liveItem.title) {
+      if (liveItems.length > 0) {
+        const rows = liveItems.map((item) => `
+          <div class="live-event-row">
+            <span class="live-event-title">${item.title}</span>
+            <span class="live-event-meta">${item.location || "Main Hall"} &bull; ${item.start || "--"}–${item.end || "--"}</span>
+          </div>`).join("");
         return `
           <section class="public-live-card is-live" id="public-live-now">
             <div class="live-now-chip">Live Now</div>
-            <div>
-              <h2>${liveItem.title}</h2>
-              <p>${liveItem.location || "Main Hall"}</p>
-              <strong>${liveItem.start || "--"} - ${liveItem.end || "--"}</strong>
-            </div>
+            <div class="live-events-list">${rows}</div>
             <a class="primary-button compact widget-nav-link" href="#public-schedule" data-section="Schedule">View Schedule</a>
           </section>`;
       }
-      const countdown = nextItem.title ? getCountdownParts(nextItem) : null;
+      const countdown = nextItems.length > 0 ? getCountdownParts(nextItems[0]) : null;
       if (countdown) {
         const parts = [
           countdown.days > 0 ? `<div class="countdown-unit"><strong>${countdown.days}</strong><span>day${countdown.days !== 1 ? "s" : ""}</span></div>` : "",
           `<div class="countdown-unit"><strong>${String(countdown.hours).padStart(2, "0")}</strong><span>hrs</span></div>`,
           `<div class="countdown-unit"><strong>${String(countdown.minutes).padStart(2, "0")}</strong><span>min</span></div>`,
         ].join('<div class="countdown-sep">:</div>');
+        const eventList = nextItems.map((item) => `
+          <div class="countdown-event-row">
+            <span class="countdown-event-name">${item.title}</span>
+            <span class="countdown-event-loc">${item.location || "Main Hall"}</span>
+          </div>`).join("");
         return `
           <section class="public-live-card is-countdown" id="public-live-now">
             <div class="live-now-chip countdown-chip">Starting Soon</div>
             <div class="countdown-hero-body">
-              <p class="countdown-event-label">Next: <strong>${nextItem.title}</strong></p>
               <div class="countdown-display">${parts}</div>
-              <p class="countdown-event-meta">${formatScheduleDate(nextItem.date)} &bull; ${nextItem.start || "--"}</p>
+              <p class="countdown-event-meta">${formatScheduleDate(nextItems[0].date)} &bull; ${nextItems[0].start || "--"}</p>
+              <div class="countdown-events-list">${eventList}</div>
             </div>
             <a class="primary-button compact widget-nav-link" href="#public-schedule" data-section="Schedule">View Schedule</a>
           </section>`;
@@ -1917,24 +1955,32 @@ function renderPublicOverview() {
         <div class="next-program-header">
           <span class="next-program-icon">${iconSvg("calendar")}</span>
           <div>
-            <span class="public-kicker">Next Program</span>
-            <h3>${nextItem.title || "Next Program"}</h3>
+            <span class="public-kicker">Next Program${nextItems.length > 1 ? "s" : ""}</span>
+            <h3>${nextItems.length > 1 ? `${nextItems.length} events` : (nextItem.title || "Next Program")}</h3>
           </div>
           <span class="starting-chip">${getTimeUntilLabel(nextItem.start, "Soon", nextItem.date)}</span>
         </div>
-        <div class="next-countdown">
-          <div class="countdown-copy">
-            <span>${iconSvg("clock")} Starts in</span>
-            <strong>${getStartsInLabel(nextItem.start, nextItem.date).replace("Starts in ", "").replace("Starting soon", "Soon")}</strong>
-          </div>
-          <div class="trophy-illustration" aria-hidden="true">
-            ${iconSvg("trophy")}
-          </div>
-        </div>
-        <div class="next-meta-row">
-          <span>${iconSvg("clock")} ${nextItem.start || "--"}</span>
-          <span>${iconSvg("map")} ${nextItem.location || "Main Hall"}</span>
-        </div>
+        ${nextItems.length > 1
+          ? `<div class="next-events-list">${nextItems.map((item) => `
+              <div class="next-event-row">
+                <span class="next-event-name">${item.title}</span>
+                <span class="next-event-loc">${iconSvg("map")} ${item.location || "Main Hall"}</span>
+              </div>`).join("")}
+            </div>`
+          : `<div class="next-countdown">
+              <div class="countdown-copy">
+                <span>${iconSvg("clock")} Starts in</span>
+                <strong>${getStartsInLabel(nextItem.start, nextItem.date).replace("Starts in ", "").replace("Starting soon", "Soon")}</strong>
+              </div>
+              <div class="trophy-illustration" aria-hidden="true">
+                ${iconSvg("trophy")}
+              </div>
+            </div>
+            <div class="next-meta-row">
+              <span>${iconSvg("clock")} ${nextItem.start || "--"}</span>
+              <span>${iconSvg("map")} ${nextItem.location || "Main Hall"}</span>
+            </div>`
+        }
         <a class="primary-button next-schedule-button widget-nav-link" href="#public-schedule" data-section="Schedule">View full schedule <span>-></span></a>
       </article>
 
