@@ -242,7 +242,11 @@ function mergeAttendanceIntoMembers(members, attendance) {
   };
 }
 
-async function bootstrapPayload() {
+let _bootstrapCache = null;
+let _bootstrapCacheTime = 0;
+const BOOTSTRAP_CACHE_TTL = 30000;
+
+async function fetchFreshBootstrap() {
   const fallback = fallbackBootstrapPayload();
 
   if (isAppsScriptConfigured()) {
@@ -275,6 +279,34 @@ async function bootstrapPayload() {
     ...mergeAttendanceIntoMembers(mergedMembers, data.attendanceRecords || fallback.attendanceRecords),
   };
 }
+
+async function bootstrapPayload() {
+  const now = Date.now();
+  if (_bootstrapCache && (now - _bootstrapCacheTime) < BOOTSTRAP_CACHE_TTL) {
+    return _bootstrapCache;
+  }
+  const result = await fetchFreshBootstrap();
+  _bootstrapCache = result;
+  _bootstrapCacheTime = Date.now();
+  return result;
+}
+
+function invalidateBootstrapCache() {
+  _bootstrapCache = null;
+  _bootstrapCacheTime = 0;
+}
+
+// Warm the cache on startup and refresh every 30 seconds in the background
+fetchFreshBootstrap().then((result) => {
+  _bootstrapCache = result;
+  _bootstrapCacheTime = Date.now();
+}).catch(() => {});
+setInterval(() => {
+  fetchFreshBootstrap().then((result) => {
+    _bootstrapCache = result;
+    _bootstrapCacheTime = Date.now();
+  }).catch(() => {});
+}, BOOTSTRAP_CACHE_TTL);
 
 function normalizeManualMember(body) {
   const suppliedCode = normalizeAttendanceCode(body.code);
@@ -465,6 +497,7 @@ async function handleApi(request, response, url) {
 
     if (isAppsScriptConfigured()) {
       const data = await appsScriptRequest("addSchedule", body);
+      invalidateBootstrapCache();
       sendJson(response, 200, data);
       return true;
     }
@@ -489,6 +522,7 @@ async function handleApi(request, response, url) {
 
     if (isAppsScriptConfigured()) {
       const data = await appsScriptRequest("updateSchedule", body);
+      invalidateBootstrapCache();
       sendJson(response, 200, data);
       return true;
     }
@@ -503,6 +537,7 @@ async function handleApi(request, response, url) {
 
     if (isAppsScriptConfigured()) {
       const data = await appsScriptRequest("deleteSchedule", body);
+      invalidateBootstrapCache();
       sendJson(response, 200, data);
       return true;
     }
@@ -517,6 +552,7 @@ async function handleApi(request, response, url) {
 
     if (isAppsScriptConfigured()) {
       const data = await appsScriptRequest("addAnnouncement", body);
+      invalidateBootstrapCache();
       sendJson(response, 200, data);
       return true;
     }
@@ -540,6 +576,7 @@ async function handleApi(request, response, url) {
 
     if (isAppsScriptConfigured()) {
       const data = await appsScriptRequest("updateAnnouncement", body);
+      invalidateBootstrapCache();
       sendJson(response, 200, data);
       return true;
     }
@@ -554,6 +591,7 @@ async function handleApi(request, response, url) {
 
     if (isAppsScriptConfigured()) {
       const data = await appsScriptRequest("deleteAnnouncement", body);
+      invalidateBootstrapCache();
       sendJson(response, 200, data);
       return true;
     }
@@ -568,6 +606,7 @@ async function handleApi(request, response, url) {
 
     if (isAppsScriptConfigured()) {
       const data = await appsScriptRequest("addUser", body);
+      invalidateBootstrapCache();
       sendJson(response, 200, data);
       return true;
     }
@@ -582,6 +621,7 @@ async function handleApi(request, response, url) {
 
     if (isAppsScriptConfigured()) {
       const data = await appsScriptRequest("updateUser", body);
+      invalidateBootstrapCache();
       sendJson(response, 200, data);
       return true;
     }
@@ -599,6 +639,7 @@ async function handleApi(request, response, url) {
 
     if (isAppsScriptConfigured()) {
       const data = await appsScriptRequest("deleteUser", body);
+      invalidateBootstrapCache();
       sendJson(response, 200, data);
       return true;
     }
