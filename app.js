@@ -57,6 +57,7 @@ let competitionsList = [];
 let competitionFinals = [];
 let selectedCompetitionId = null;
 let competitionFinalMsg = "";
+let finalPositionsTab = "enter";
 let adminUserSearch = "";
 let adminUserRoleFilter = "All";
 let editingScheduleRow = null;
@@ -4437,16 +4438,19 @@ function renderMemberRow(member, mi) {
     .join("");
   return `
     <div class="member-row" data-member-idx="${mi}">
+      <div class="member-row-head">
+        <span class="member-row-label">Member ${mi + 1}</span>
+        <button class="member-remove-btn remove-member-row-btn" title="Remove" type="button">✕ Remove</button>
+      </div>
       <div class="member-code-wrap">
-        <input class="member-code-input" value="${escapeAttribute(member?.code || "")}" placeholder="Code / search name" autocomplete="off" />
+        <input class="member-code-input" value="${escapeAttribute(member?.code || "")}" placeholder="Search by code or name…" autocomplete="off" />
         <div class="member-ac-dropdown" style="display:none"></div>
       </div>
       <input class="member-name-input" value="${escapeAttribute(member?.name || "")}" placeholder="Full name" />
       <select class="member-halqa-select">
-        <option value="">— halqa —</option>
+        <option value="">— Select halqa —</option>
         ${halqaOpts}
       </select>
-      <button class="finals-icon-btn remove-member-row-btn" title="Remove member" type="button">✕</button>
     </div>
   `;
 }
@@ -4458,16 +4462,16 @@ function renderPositionSlot(entry, idx) {
   return `
     <div class="position-slot" data-entry-id="${escapeAttribute(entry?.id || "")}" data-slot-idx="${idx}">
       <div class="position-slot-header">
-        <label class="slot-rank-label">
-          <span>Position</span>
+        <div class="slot-rank-wrap">
+          <span class="slot-rank-label">Position</span>
           <select class="rank-select">${rankOpts}</select>
-        </label>
+        </div>
         <button class="danger-button compact remove-slot-btn" type="button">Remove</button>
       </div>
       <div class="member-list">
         ${members.map((m, mi) => renderMemberRow(m, mi)).join("")}
       </div>
-      <button class="secondary-button compact add-member-row-btn" type="button">+ Add Member</button>
+      <button class="secondary-button fp-add-member-btn add-member-row-btn" type="button">+ Add Member</button>
     </div>
   `;
 }
@@ -4479,110 +4483,115 @@ function renderFinalPositionsManager(categoryFilter) {
 
   const activeComp = selectedCompetitionId
     ? competitionsList.find((c) => c.id === selectedCompetitionId && (!categoryFilter || c.category === categoryFilter))
-    : null;
+    : visibleComps[0] || null;
+
+  if (activeComp && !selectedCompetitionId) selectedCompetitionId = activeComp.id;
 
   const currentEntries = activeComp ? competitionFinals.filter((f) => f.competitionId === activeComp.id) : [];
   const rankOrder = { "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5, "6th": 6, "7th": 7, "8th": 8, "9th": 9, "10th": 10 };
   const sortedEntries = [...currentEntries].sort((a, b) => (rankOrder[a.rank] || 99) - (rankOrder[b.rank] || 99));
 
+  const compSelector = `
+    <div class="fp-comp-bar">
+      <select id="fpCompSelect">
+        <option value="">— Select competition —</option>
+        ${visibleComps.map((c) => `<option value="${escapeAttribute(c.id)}" ${activeComp?.id === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+      </select>
+      <button class="secondary-button compact show-new-comp-form-btn" type="button">+ New</button>
+      ${activeComp ? `<button class="danger-button compact delete-active-comp-btn" data-comp-id="${escapeAttribute(activeComp.id)}" type="button">Delete</button>` : ""}
+    </div>
+    <form class="finals-new-comp-form fp-new-comp-form" id="newCompForm" style="display:none">
+      <label class="field">
+        <span>Competition name</span>
+        <input name="name" placeholder="e.g. Nazm, Relay Race" required />
+      </label>
+      <div class="form-grid">
+        <label class="field">
+          <span>Category</span>
+          <select name="category">
+            ${categoryFilter ? `<option>${categoryFilter}</option>` : `<option>Education</option><option>Sports</option>`}
+          </select>
+        </label>
+        <label class="field">
+          <span>Type</span>
+          <select name="type">
+            <option>Individual</option>
+            <option>Team</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-actions">
+        <button class="secondary-button compact cancel-new-comp-btn" type="button">Cancel</button>
+        <button class="primary-button compact" type="submit">Add</button>
+      </div>
+    </form>
+  `;
+
+  const defaultSlots = ["1st", "2nd", "3rd"].map((rank) => {
+    const existing = sortedEntries.find((e) => e.rank === rank);
+    return existing || { id: "", rank, members: [{ code: "", name: "", halqa: "" }] };
+  });
+  const extraSlots = sortedEntries.filter((e) => !["1st", "2nd", "3rd"].includes(e.rank));
+  const allSlots = [...defaultSlots, ...extraSlots];
+
+  const enterTab = !activeComp
+    ? `<div class="finals-empty-state">${iconSvg("trophy")}<p>No competitions yet. Click "+ New" to add one.</p></div>`
+    : `
+      <div id="positionSlotsContainer">
+        ${allSlots.map((entry, idx) => renderPositionSlot(entry, idx)).join("")}
+      </div>
+      <button class="secondary-button fp-add-pos-btn add-position-slot-btn" data-comp-id="${escapeAttribute(activeComp.id)}" type="button">+ Add more positions</button>
+      ${competitionFinalMsg ? `<div class="portal-message">${escapeHtml(competitionFinalMsg)}</div>` : ""}
+      <div class="fp-save-bar">
+        <button class="primary-button save-all-positions-btn" data-comp-id="${escapeAttribute(activeComp.id)}" type="button">Save All Positions</button>
+      </div>
+    `;
+
+  const viewCards = visibleComps.map((c) => {
+    const entries = [...competitionFinals.filter((f) => f.competitionId === c.id)]
+      .sort((a, b) => (rankOrder[a.rank] || 99) - (rankOrder[b.rank] || 99));
+    return `
+      <div class="fp-view-card">
+        <div class="fp-view-card-head">
+          <strong>${escapeHtml(c.name)}</strong>
+          <span class="pill ${c.category === "Education" ? "category-education" : "category-sports"}">${c.category}</span>
+        </div>
+        ${entries.length === 0
+          ? `<p class="fp-view-empty">No positions saved yet.</p>`
+          : entries.map((e) => `
+              <div class="fp-view-entry">
+                <span class="fp-view-rank">${e.rank}</span>
+                <div>${(e.members || []).map((m) => `<span>${escapeHtml(m.name)}${m.halqa ? ` <em>(${escapeHtml(m.halqa)})</em>` : ""}</span>`).join("")}</div>
+              </div>
+            `).join("")}
+      </div>
+    `;
+  }).join("");
+
+  const viewTab = visibleComps.length === 0
+    ? `<div class="finals-empty-state">${iconSvg("trophy")}<p>No competitions yet.</p></div>`
+    : `
+      <div class="fp-view-actions">
+        <button class="primary-button compact" id="fpPrintBtn" type="button">Print Report</button>
+      </div>
+      <div id="fpPrintArea">
+        <div class="fp-print-header">
+          <h2>Final Positions Report</h2>
+          <p>Majlis Muqami MKAC Ijtima${categoryFilter ? " — " + categoryFilter : ""}</p>
+        </div>
+        ${viewCards}
+      </div>
+    `;
+
   return `
     <section class="finals-manager-shell" id="finalsManagerShell">
-      <div class="finals-layout">
-        <aside class="finals-sidebar">
-          <div class="finals-sidebar-top">
-            <strong>${categoryFilter ? categoryFilter + " " : ""}Competitions</strong>
-            <button class="secondary-button compact show-new-comp-form-btn" type="button">+ New</button>
-          </div>
-
-          <form class="finals-new-comp-form" id="newCompForm" style="display:none">
-            <label class="field">
-              <span>Name</span>
-              <input name="name" placeholder="e.g. Nazm, Relay Race" required />
-            </label>
-            <div class="form-grid">
-              <label class="field">
-                <span>Category</span>
-                <select name="category">
-                  ${categoryFilter
-                    ? `<option>${categoryFilter}</option>`
-                    : `<option>Education</option><option>Sports</option>`}
-                </select>
-              </label>
-              <label class="field">
-                <span>Type</span>
-                <select name="type">
-                  <option>Individual</option>
-                  <option>Team</option>
-                </select>
-              </label>
-            </div>
-            <div class="form-actions">
-              <button class="primary-button compact" type="submit">Add Competition</button>
-              <button class="secondary-button compact cancel-new-comp-btn" type="button">Cancel</button>
-            </div>
-          </form>
-
-          <div class="finals-comp-list">
-            ${
-              visibleComps.length === 0
-                ? `<div class="access-note">No competitions yet. Click "+ New" to add one.</div>`
-                : visibleComps
-                    .map((c) => {
-                      const count = competitionFinals.filter((f) => f.competitionId === c.id).length;
-                      const isActive = activeComp?.id === c.id;
-                      return `
-                        <div class="finals-comp-item${isActive ? " is-active" : ""}" data-comp-id="${escapeAttribute(c.id)}">
-                          <div class="finals-comp-item-info">
-                            <strong>${escapeHtml(c.name)}</strong>
-                            <div class="finals-comp-meta">
-                              <span class="pill ${c.category === "Education" ? "category-education" : "category-sports"}">${c.category}</span>
-                              <em>${c.type}</em>
-                              <small>${count} entr${count === 1 ? "y" : "ies"}</small>
-                            </div>
-                          </div>
-                          <button class="finals-icon-btn delete-comp-btn" data-comp-id="${escapeAttribute(c.id)}" title="Delete competition" type="button">✕</button>
-                        </div>
-                      `;
-                    })
-                    .join("")
-            }
-          </div>
-        </aside>
-
-        <div class="finals-entry-area">
-          ${
-            !activeComp
-              ? `<div class="finals-empty-state">
-                   ${iconSvg("trophy")}
-                   <p>Select a competition from the list to enter final positions.</p>
-                 </div>`
-              : `
-                <div class="finals-entry-header">
-                  <div>
-                    <h4>${escapeHtml(activeComp.name)}</h4>
-                    <span class="pill ${activeComp.category === "Education" ? "category-education" : "category-sports"}">${activeComp.category}</span>
-                    <em style="margin-left:6px;font-style:normal;font-size:0.85rem;color:var(--muted)">${activeComp.type}</em>
-                  </div>
-                  <p class="finals-entry-hint">Type a code or name in any Code field to search members. Same rank = tie. Up to 20 members per position.</p>
-                </div>
-
-                <div id="positionSlotsContainer">
-                  ${
-                    sortedEntries.length === 0
-                      ? `<div class="access-note" id="noPositionsNote">No positions entered yet. Click "Add Position" below.</div>`
-                      : sortedEntries.map((entry, idx) => renderPositionSlot(entry, idx)).join("")
-                  }
-                </div>
-
-                <div class="finals-slot-actions">
-                  <button class="secondary-button add-position-slot-btn" data-comp-id="${escapeAttribute(activeComp.id)}" type="button">+ Add Position</button>
-                  <button class="primary-button save-all-positions-btn" data-comp-id="${escapeAttribute(activeComp.id)}" type="button">Save All Positions</button>
-                </div>
-                ${competitionFinalMsg ? `<div class="portal-message">${escapeHtml(competitionFinalMsg)}</div>` : ""}
-              `
-          }
-        </div>
+      <div class="fp-tabs">
+        <button class="fp-tab-btn${finalPositionsTab === "enter" ? " is-active" : ""}" data-fp-tab="enter" type="button">Enter Results</button>
+        <button class="fp-tab-btn${finalPositionsTab === "view" ? " is-active" : ""}" data-fp-tab="view" type="button">View Results</button>
       </div>
+
+      ${finalPositionsTab === "enter" ? `<div class="fp-tab-body">${compSelector}${enterTab}</div>` : ""}
+      ${finalPositionsTab === "view" ? `<div class="fp-tab-body fp-view-body">${viewTab}</div>` : ""}
     </section>
   `;
 }
@@ -5220,6 +5229,7 @@ function renderEducationScoreEntry() {
             <small>Code: ${selectedParticipant.code || "N/A"} | Halqa: ${selectedParticipant.halqa}</small>
           </div>
         </div>
+        <button class="mobile-add-participant-toggle" type="button" id="addParticipantToggle">+ Add Missing Participant</button>
         <div class="participant-add-panel">
           <div class="team-fields-head">
             <strong>Add Missing Participant</strong>
@@ -5481,10 +5491,7 @@ function renderSportsResultEntry() {
                     <input name="${item.position}ScoreValue" placeholder="3-1, 12.8, 9.4" />
                   </label>
                   <div class="sports-roster-block">
-                    <div class="team-fields-head">
-                      <strong>Participants</strong>
-                      <span>Search tajnid or type manually</span>
-                    </div>
+                    <button class="mobile-roster-toggle" type="button" data-roster-toggle="${item.position}">+ Add Participants</button>
                     <div class="sports-card-search">
                       <input data-sports-tajnid-search="${item.position}" placeholder="Search member code or name" />
                       <div class="participant-search-results" data-sports-tajnid-results="${item.position}"></div>
@@ -6486,11 +6493,14 @@ function bindDynamicControls() {
     searchInput.focus();
     searchInput.addEventListener("input", (event) => {
       attendanceSearch = event.target.value;
+      const cursorPos = event.target.selectionStart;
       attendanceMessage = "";
       renderDashboard(currentRole);
-      const refreshedInput = document.querySelector("#attendanceSearchInput");
-      refreshedInput?.focus();
-      refreshedInput?.setSelectionRange(attendanceSearch.length, attendanceSearch.length);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const refreshedInput = document.querySelector("#attendanceSearchInput");
+        refreshedInput?.focus();
+        refreshedInput?.setSelectionRange(cursorPos, cursorPos);
+      }));
     });
 
     searchInput.addEventListener("keydown", (event) => {
@@ -6702,14 +6712,59 @@ function bindDynamicControls() {
     renderDashboard(currentRole);
   });
 
-  // Finals Manager: competition list actions (direct, since full re-render follows)
-  document.querySelectorAll(".finals-comp-item").forEach((item) => {
-    item.addEventListener("click", (e) => {
-      if (e.target.closest(".delete-comp-btn")) return;
-      selectedCompetitionId = item.dataset.compId;
-      competitionFinalMsg = "";
+  // Finals Manager: tab switcher
+  document.querySelectorAll(".fp-tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      finalPositionsTab = btn.dataset.fpTab;
       renderDashboard(currentRole);
     });
+  });
+
+  document.querySelector("#fpPrintBtn")?.addEventListener("click", () => {
+    const area = document.querySelector("#fpPrintArea");
+    if (!area) return;
+    const win = window.open("", "_blank");
+    win.document.write(`<!DOCTYPE html><html><head><title>Final Positions Report</title><style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #111; }
+      h2 { margin: 0 0 4px; font-size: 22px; }
+      p { margin: 0 0 24px; color: #555; font-size: 14px; }
+      .fp-view-card { border: 1px solid #ddd; border-radius: 8px; margin-bottom: 16px; page-break-inside: avoid; }
+      .fp-view-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f5f5f5; border-bottom: 1px solid #ddd; font-weight: 700; font-size: 15px; }
+      .pill { background: #e0f2f1; color: #0f766e; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+      .fp-view-entry { display: flex; gap: 14px; padding: 10px 14px; border-bottom: 1px solid #eee; }
+      .fp-view-entry:last-child { border-bottom: none; }
+      .fp-view-rank { font-weight: 800; min-width: 40px; color: #0f766e; }
+      em { color: #888; font-style: normal; font-size: 13px; }
+      .fp-view-empty { padding: 10px 14px; color: #999; font-size: 13px; }
+      @media print { body { margin: 16px; } }
+    </style></head><body>${area.innerHTML}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
+  });
+
+  // Finals Manager: competition dropdown
+  document.querySelector("#fpCompSelect")?.addEventListener("change", (e) => {
+    selectedCompetitionId = e.target.value || null;
+    competitionFinalMsg = "";
+    renderDashboard(currentRole);
+  });
+
+  // Finals Manager: delete active competition button
+  document.querySelector(".delete-active-comp-btn")?.addEventListener("click", async (e) => {
+    const compId = e.currentTarget.dataset.compId;
+    const comp = competitionsList.find((c) => c.id === compId);
+    if (!comp || !window.confirm(`Delete "${comp.name}" and all its positions?`)) return;
+    try {
+      const data = await apiRequest("/api/competitions/delete", { method: "POST", body: JSON.stringify({ id: compId }) });
+      competitionsList = data.competitionsList || competitionsList;
+      competitionFinals = data.competitionFinals || competitionFinals;
+    } catch {
+      competitionsList = competitionsList.filter((c) => c.id !== compId);
+      competitionFinals = competitionFinals.filter((f) => f.competitionId !== compId);
+    }
+    selectedCompetitionId = null;
+    renderDashboard(currentRole);
   });
 
   document.querySelectorAll(".delete-comp-btn").forEach((btn) => {
@@ -7490,6 +7545,14 @@ function bindDynamicControls() {
     syncParticipantDetails();
     syncLiveTotal();
 
+    document.querySelector("#addParticipantToggle")?.addEventListener("click", (e) => {
+      const panel = document.querySelector(".participant-add-panel");
+      const btn = e.currentTarget;
+      const open = panel.classList.toggle("is-open");
+      btn.classList.toggle("is-open", open);
+      btn.textContent = open ? "− Hide Participant Panel" : "+ Add Missing Participant";
+    });
+
     document.querySelectorAll(".queue-item").forEach((button) => {
       button.addEventListener("click", () => {
         if (participantSelect) {
@@ -7632,6 +7695,15 @@ function bindDynamicControls() {
           rosterWrap.querySelectorAll("input").forEach((input) => input.addEventListener("input", syncSportsPreview));
         }
         syncSportsPreview();
+      });
+    });
+
+    sportsResultForm.querySelectorAll("[data-roster-toggle]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const block = btn.closest(".sports-roster-block");
+        const open = block.classList.toggle("is-open");
+        btn.classList.toggle("is-open", open);
+        btn.textContent = open ? "− Hide Participants" : "+ Add Participants";
       });
     });
 
