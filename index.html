@@ -4,9 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Majlis Muqami MKAC Ijtima</title>
-    <link rel="preload" href="styles.css?v=3" as="style" />
-    <link rel="preload" href="app.js?v=3" as="script" />
-    <link rel="stylesheet" href="styles.css?v=3" />
+    <link rel="preload" href="styles.css?v=4" as="style" />
+    <link rel="preload" href="app.js?v=4" as="script" />
+    <link rel="stylesheet" href="styles.css?v=4" />
   </head>
   <body>
     <section class="login-screen is-hidden" id="loginScreen" aria-modal="true" role="dialog" aria-labelledby="loginTitle">
@@ -70,12 +70,15 @@
           </div>
 
           <div class="session-box">
-            <div>
-              <span id="sessionLabel">Public view</span>
-              <strong id="signedInUser">General User</strong>
+            <div class="session-info">
+              <div>
+                <span id="sessionLabel">Public view</span>
+                <strong id="signedInUser">General User</strong>
+              </div>
+              <button class="primary-button compact" id="loginButton" type="button">Login</button>
+              <button class="secondary-button" id="logoutButton" type="button">Logout</button>
             </div>
-            <button class="primary-button compact" id="loginButton" type="button">Login</button>
-            <button class="secondary-button" id="logoutButton" type="button">Logout</button>
+            <img class="topbar-logo" src="/logo.png" alt="Majlis Muqami MKAC Ijtima" />
           </div>
         </header>
 
@@ -83,6 +86,6 @@
       </main>
     </div>
 
-    <script src="app.js?v=3" defer></script>
+    <script src="app.js?v=4" defer></script>
   </body>
 </html>
