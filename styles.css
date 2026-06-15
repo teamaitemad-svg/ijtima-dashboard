@@ -5805,6 +5805,36 @@ a.wide-soft-action {
     grid-template-columns: 1fr;
   }
 
+  .public-live-card.is-countdown {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 20px;
+  }
+
+  .public-live-card.is-countdown .primary-button {
+    width: 100%;
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  .countdown-display {
+    flex-wrap: wrap;
+  }
+
+  .countdown-unit {
+    min-width: 44px;
+  }
+
+  .countdown-unit strong {
+    font-size: clamp(26px, 8vw, 42px) !important;
+  }
+
+  .countdown-sep {
+    font-size: clamp(20px, 6vw, 32px);
+  }
+
   .schedule-hero {
     grid-template-columns: 1fr;
   }
