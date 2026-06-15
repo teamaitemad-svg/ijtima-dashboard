@@ -2,6 +2,7 @@ const { appendValues, getValues, isSheetsConfigured } = require("./sheetsClient"
 
 const tabs = {
   users: "Users",
+  masterMembers: "Master Members",
   schedule: "Schedule",
   announcements: "Announcements",
   members: "Members",
@@ -46,9 +47,10 @@ async function readBootstrap(fallback) {
     return fallback;
   }
 
-  const [scheduleRows, announcementRows, memberRows, attendanceRows, rankingRows, competitionRows] = await Promise.all([
+  const [scheduleRows, announcementRows, masterMemberRows, memberRows, attendanceRows, rankingRows, competitionRows] = await Promise.all([
     getValues(tabs.schedule, "A2:F"),
     getValues(tabs.announcements, "A2:D"),
+    getValues(tabs.masterMembers, "A2:D").catch(() => []),
     getValues(tabs.members, "A2:F"),
     getValues(tabs.attendance, "A2:E"),
     getValues(tabs.rankings, "A2:F"),
@@ -71,14 +73,42 @@ async function readBootstrap(fallback) {
     priority: row[3] || "Info",
   }));
 
-  const memberRecords = mapRows(memberRows, (row) => ({
+  const masterMemberRecords = mapRows(masterMemberRows, (row) => ({
     code: row[0],
     name: row[1],
     halqa: row[2],
-    registered: truthy(row[3]),
+    phone: row[3] || "",
+    source: "master",
+  }));
+
+  const registrationRecords = mapRows(memberRows, (row) => ({
+    code: row[0],
+    name: row[1],
+    halqa: row[2],
+    registered: row[3] === undefined || row[3] === "" ? true : truthy(row[3]),
     attended: truthy(row[4]),
     checkIn: row[5] || "",
+    source: "registration",
   }));
+  const registrationByCode = new Map(registrationRecords.map((member) => [String(member.code || "").trim(), member]));
+  const sourceMembers = masterMemberRecords.length ? masterMemberRecords : fallback.masterMemberRecords || fallback.memberRecords;
+  const memberRecords = sourceMembers.map((member) => {
+    const registration = registrationByCode.get(String(member.code || "").trim());
+    return {
+      ...member,
+      registered: Boolean(registration?.registered),
+      attended: Boolean(registration?.attended || member.attended),
+      checkIn: registration?.checkIn || member.checkIn || "",
+      registrationName: registration?.name || "",
+    };
+  });
+
+  registrationRecords.forEach((registration) => {
+    const hasMasterMember = memberRecords.some((member) => String(member.code || "").trim() === String(registration.code || "").trim());
+    if (!hasMasterMember) {
+      memberRecords.push({ ...registration, source: "registration-only" });
+    }
+  });
 
   const attendanceRecords = mapRows(attendanceRows, (row) => ({
     code: row[0],
@@ -111,6 +141,8 @@ async function readBootstrap(fallback) {
     ...fallback,
     scheduleItems: scheduleItems.length ? scheduleItems : fallback.scheduleItems,
     announcements: announcements.length ? announcements : fallback.announcements,
+    masterMemberRecords: masterMemberRecords.length ? masterMemberRecords : fallback.masterMemberRecords || fallback.memberRecords,
+    registrationRecords: registrationRecords.length ? registrationRecords : fallback.registrationRecords || fallback.memberRecords,
     memberRecords: memberRecords.length ? memberRecords : fallback.memberRecords,
     attendanceRecords: attendanceRecords.length ? attendanceRecords : fallback.attendanceRecords,
     halqaRankings: halqaRankings.length ? halqaRankings : fallback.halqaRankings,

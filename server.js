@@ -107,236 +107,23 @@ async function appsScriptRequest(action, payload) {
   return data;
 }
 
-const halqajat = [
-  "Jamia Ahmadiyya",
-  "Kleinburg North",
-  "Kleinburg South",
-  "Maple",
-  "Peace Village Center East",
-  "Peace Village Center West",
-  "Peace Village East",
-  "Peace Village South East",
-  "Peace Village South West",
-  "Peace Village West",
-  "Springside",
-  "Vaughan East",
-  "Vaughan North",
-  "Vaughan South",
-  "Woodbridge North",
-  "Woodbridge South",
-];
-
-const halqaTajnidReference = {
-  "Peace Village West": { registrations: 34, tajnid: 72 },
-  "Peace Village Center East": { registrations: 41, tajnid: 112 },
-  "Vaughan East": { registrations: 21, tajnid: 88 },
-  "Peace Village Center West": { registrations: 18, tajnid: 82 },
-  "Vaughan North": { registrations: 19, tajnid: 131 },
-  "Woodbridge North": { registrations: 19, tajnid: 142 },
-  "Vaughan South": { registrations: 12, tajnid: 100 },
-  "Peace Village East": { registrations: 15, tajnid: 143 },
-  "Peace Village South East": { registrations: 9, tajnid: 87 },
-  Springside: { registrations: 10, tajnid: 99 },
-  Maple: { registrations: 11, tajnid: 110 },
-  "Kleinburg South": { registrations: 6, tajnid: 68 },
-  "Peace Village South West": { registrations: 7, tajnid: 98 },
-  "Kleinburg North": { registrations: 5, tajnid: 101 },
-  "Jamia Ahmadiyya": { registrations: 2, tajnid: 104 },
-  "Woodbridge South": { registrations: 0, tajnid: 91 },
-};
-
-const users = [
-  { username: "admin", password: "admin123", name: "Admin User", role: "admin", access: "Full portal access" },
-  ...halqajat.map((halqa, index) => {
-    const number = String(index + 1).padStart(2, "0");
-    return {
-      username: `zaim${number}`,
-      password: "zaim123",
-      name: `Zaim ${number}`,
-      role: "zaim",
-      halqa,
-      access: `${halqa} only`,
-    };
-  }),
-  {
-    username: "attendance",
-    password: "attend123",
-    name: "Attendance Team",
-    role: "attendance",
-    access: "Check-in portal access",
-  },
-  {
-    username: "edujudge1",
-    password: "judge123",
-    name: "Education Judge 1",
-    role: "educationJudge",
-    access: "Education judging access",
-  },
-  {
-    username: "edujudge2",
-    password: "judge123",
-    name: "Education Judge 2",
-    role: "educationJudge",
-    access: "Education judging access",
-  },
-  {
-    username: "edujudge3",
-    password: "judge123",
-    name: "Education Judge 3",
-    role: "educationJudge",
-    access: "Education judging access",
-  },
-  {
-    username: "sportsadmin",
-    password: "sports123",
-    name: "Sports Admin",
-    role: "sportsAdmin",
-    access: "Sports results access",
-  },
-  { username: "av", password: "av123", name: "AV Team", role: "av", access: "Projector display access" },
-];
-
-const scheduleItems = [
-  {
-    start: "09:00 AM",
-    end: "09:30 AM",
-    title: "Opening Session",
-    location: "Main Hall",
-    lead: "Ijtima Nazim",
-    status: "Completed",
-  },
-  {
-    start: "09:30 AM",
-    end: "10:15 AM",
-    title: "Tilawat & Nazm",
-    location: "Main Hall",
-    lead: "Education Team",
-    status: "Live",
-  },
-  {
-    start: "10:20 AM",
-    end: "11:15 AM",
-    title: "Educational Competitions",
-    location: "Classroom Block",
-    lead: "Taleem Department",
-    status: "Next",
-  },
-  {
-    start: "10:30 AM",
-    end: "12:00 PM",
-    title: "Sports Round 1",
-    location: "Sports Ground",
-    lead: "Sports Team",
-    status: "Upcoming",
-  },
-  {
-    start: "12:15 PM",
-    end: "01:00 PM",
-    title: "Lunch & Prayer Break",
-    location: "Dining Area",
-    lead: "Logistics Team",
-    status: "Upcoming",
-  },
-];
-
-const announcements = [
-  {
-    title: "Registration desk open",
-    message: "Pre-registered members can collect badges from the entrance desk.",
-    time: "08:45 AM",
-    priority: "Info",
-  },
-  {
-    title: "Sports location update",
-    message: "Football round 1 has moved to the north field.",
-    time: "09:20 AM",
-    priority: "Important",
-  },
-  {
-    title: "Lunch timing",
-    message: "Lunch will begin after Zuhr prayer in the dining area.",
-    time: "11:50 AM",
-    priority: "Info",
-  },
-];
-
-const halqaRankings = [
-  { halqa: "Jamia Ahmadiyya", attendance: 88, education: 24, sports: 18 },
-  { halqa: "Kleinburg North", attendance: 76, education: 31, sports: 12 },
-  { halqa: "Kleinburg South", attendance: 91, education: 18, sports: 22 },
-  { halqa: "Maple", attendance: 69, education: 26, sports: 28 },
-  { halqa: "Peace Village Center East", attendance: 82, education: 16, sports: 15 },
-  { halqa: "Peace Village Center West", attendance: 94, education: 21, sports: 26 },
-  { halqa: "Peace Village East", attendance: 73, education: 29, sports: 11 },
-  { halqa: "Peace Village South East", attendance: 86, education: 14, sports: 20 },
-  { halqa: "Peace Village South West", attendance: 78, education: 22, sports: 24 },
-  { halqa: "Peace Village West", attendance: 90, education: 27, sports: 17 },
-  { halqa: "Springside", attendance: 64, education: 19, sports: 30 },
-  { halqa: "Vaughan East", attendance: 81, education: 25, sports: 13 },
-  { halqa: "Vaughan North", attendance: 71, education: 17, sports: 21 },
-  { halqa: "Vaughan South", attendance: 84, education: 30, sports: 16 },
-  { halqa: "Woodbridge North", attendance: 79, education: 20, sports: 19 },
-  { halqa: "Woodbridge South", attendance: 87, education: 23, sports: 25 },
-]
-  .map((item) => ({ ...item, total: Math.round(item.attendance * 0.5 + item.education + item.sports) }))
-  .sort((a, b) => b.total - a.total)
-  .map((item, index) => ({ ...item, rank: index + 1 }));
-
-const competitionResults = [
-  {
-    category: "Education",
-    competition: "Tilawat",
-    position: "1st",
-    name: "Ahmad Khan",
-    halqa: "Peace Village Center West",
-  },
-  { category: "Education", competition: "Nazm", position: "1st", name: "Bilal Ahmed", halqa: "Vaughan South" },
-  { category: "Education", competition: "Speech", position: "1st", name: "Sameer Malik", halqa: "Kleinburg North" },
-  { category: "Sports", competition: "Football", position: "1st", name: "Team Springside", halqa: "Springside" },
-  { category: "Sports", competition: "100m Race", position: "1st", name: "Usman Raza", halqa: "Maple" },
-  {
-    category: "Sports",
-    competition: "Tug of War",
-    position: "1st",
-    name: "Team Woodbridge South",
-    halqa: "Woodbridge South",
-  },
-];
-
-const memberRecords = halqajat.flatMap((halqa, halqaIndex) => {
-  const baseCode = (halqaIndex + 1) * 1000;
-  const registrationTarget = halqaTajnidReference[halqa]?.registrations || 0;
-  const attendedTarget = Math.round(registrationTarget * (halqaIndex % 4 === 0 ? 0.7 : halqaIndex % 4 === 1 ? 0.55 : 0.45));
-
-  return Array.from({ length: registrationTarget }, (_, memberIndex) => {
-    const attended = memberIndex < attendedTarget;
-    const checkInTimes = ["09:05 AM", "09:18 AM", "09:42 AM", "10:10 AM", "10:35 AM"];
-
-    return {
-      code: `M${baseCode + memberIndex + 1}`,
-      name: `Member ${baseCode + memberIndex + 1}`,
-      halqa,
-      registered: true,
-      attended,
-      checkIn: attended ? checkInTimes[memberIndex % checkInTimes.length] : "",
-    };
-  });
-});
-
-const attendanceRecords = memberRecords
-  .filter((member) => member.attended)
-  .map((member) => ({
-    code: member.code,
-    name: member.name,
-    halqa: member.halqa,
-    checkIn: member.checkIn,
-    checkedInBy: "Demo seed",
-  }));
+const halqajat = [];
+const users = [];
+const scheduleItems = [];
+const announcements = [];
+const halqaRankings = [];
+const competitionResults = [];
+const masterMemberRecords = [];
+const memberRecords = [];
+const attendanceRecords = [];
 
 const educationJudgeResults = [];
 const educationCompetitionRosters = {};
 const sportsCompetitionRosters = {};
 const sportsPostedResults = [];
+
+let competitionsList = [];
+let competitionFinals = [];
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, { "Content-Type": "application/json" });
@@ -381,17 +168,43 @@ function fallbackBootstrapPayload() {
     announcements,
     halqaRankings,
     competitionResults,
+    masterMemberRecords,
+    registrationRecords: memberRecords,
     memberRecords,
     attendanceRecords,
     educationJudgeResults,
     educationCompetitionRosters,
     sportsCompetitionRosters,
     sportsPostedResults,
+    competitionsList,
+    competitionFinals,
   };
 }
 
 function normalizeAttendanceCode(code) {
   return String(code || "").trim();
+}
+
+function mergeMasterAndRegistrations(masterMembers, registrations) {
+  const registrationByCode = new Map((registrations || []).map((member) => [normalizeAttendanceCode(member.code), member]));
+  const merged = (masterMembers || []).map((member) => {
+    const registration = registrationByCode.get(normalizeAttendanceCode(member.code));
+    return {
+      ...member,
+      registered: Boolean(registration?.registered ?? member.registered),
+      attended: Boolean(registration?.attended || member.attended),
+      checkIn: registration?.checkIn || member.checkIn || "",
+      source: member.source || "master",
+    };
+  });
+
+  (registrations || []).forEach((registration) => {
+    if (!merged.some((member) => normalizeAttendanceCode(member.code) === normalizeAttendanceCode(registration.code))) {
+      merged.push({ ...registration, source: registration.source || "registration-only" });
+    }
+  });
+
+  return merged;
 }
 
 function mergeAttendanceIntoMembers(members, attendance) {
@@ -421,6 +234,7 @@ function mergeAttendanceIntoMembers(members, attendance) {
         ...member,
         attended: Boolean(member.attended || attendanceRecord),
         checkIn: member.checkIn || attendanceRecord?.checkIn || "",
+        registered: Boolean(member.registered),
       };
     }),
     attendanceRecords: uniqueAttendance,
@@ -432,8 +246,12 @@ async function bootstrapPayload() {
 
   if (isAppsScriptConfigured()) {
     const data = await appsScriptRequest("bootstrap");
+    const mergedMembers = mergeMasterAndRegistrations(
+      data.masterMemberRecords || data.memberRecords || fallback.masterMemberRecords || fallback.memberRecords,
+      data.registrationRecords || data.memberRecords || fallback.registrationRecords || fallback.memberRecords
+    );
     const mergedAttendance = mergeAttendanceIntoMembers(
-      data.memberRecords || fallback.memberRecords,
+      mergedMembers,
       data.attendanceRecords || fallback.attendanceRecords
     );
     return {
@@ -446,9 +264,28 @@ async function bootstrapPayload() {
   }
 
   const data = await readBootstrap(fallback);
+  const mergedMembers = mergeMasterAndRegistrations(
+    data.masterMemberRecords || fallback.masterMemberRecords || fallback.memberRecords,
+    data.registrationRecords || data.memberRecords || fallback.registrationRecords || fallback.memberRecords
+  );
   return {
     ...data,
-    ...mergeAttendanceIntoMembers(data.memberRecords || fallback.memberRecords, data.attendanceRecords || fallback.attendanceRecords),
+    masterMemberRecords: data.masterMemberRecords || fallback.masterMemberRecords || fallback.memberRecords,
+    ...mergeAttendanceIntoMembers(mergedMembers, data.attendanceRecords || fallback.attendanceRecords),
+  };
+}
+
+function normalizeManualMember(body) {
+  const suppliedCode = normalizeAttendanceCode(body.code);
+  return {
+    code: suppliedCode || `WALK-${Date.now().toString(36)}`,
+    name: String(body.name || "").trim(),
+    halqa: String(body.halqa || "").trim(),
+    phone: String(body.phone || "").trim(),
+    registered: false,
+    attended: false,
+    checkIn: "",
+    source: suppliedCode ? "manual" : "walk-in",
   };
 }
 
@@ -532,14 +369,20 @@ async function handleApi(request, response, url) {
     const activeData = await bootstrapPayload();
     const activeMembers = activeData.memberRecords;
     const activeAttendance = activeData.attendanceRecords;
-    const member = activeMembers.find((record) => record.code === body.code);
+    let member = activeMembers.find((record) => normalizeAttendanceCode(record.code) === normalizeAttendanceCode(body.code));
 
     if (!member) {
-      sendError(response, 404, "Member was not found.");
-      return true;
+      member = normalizeManualMember(body.member || body);
+
+      if (!member.name || !member.halqa) {
+        sendError(response, 404, "Member was not found. Enter name and halqa to add a manual walk-in.");
+        return true;
+      }
+
+      activeMembers.push(member);
     }
 
-    if (member.attended) {
+    if (member.attended || activeAttendance.some((record) => normalizeAttendanceCode(record.code) === normalizeAttendanceCode(member.code))) {
       sendJson(response, 409, { error: `${member.name} is already checked in.`, member, attendanceRecords });
       return true;
     }
@@ -554,14 +397,18 @@ async function handleApi(request, response, url) {
       halqa: member.halqa,
       checkIn,
       checkedInBy: body.checkedInBy || "Attendance Team",
+      registered: Boolean(member.registered),
+      source: member.source || (member.registered ? "registered" : "unregistered"),
     };
     activeAttendance.unshift(attendanceRecord);
 
     if (!isSheetsConfigured()) {
-      const fallbackMember = memberRecords.find((record) => record.code === body.code);
+      const fallbackMember = memberRecords.find((record) => normalizeAttendanceCode(record.code) === normalizeAttendanceCode(member.code));
       if (fallbackMember) {
         fallbackMember.attended = true;
         fallbackMember.checkIn = checkIn;
+      } else {
+        memberRecords.push(member);
       }
       attendanceRecords.unshift(attendanceRecord);
     }
@@ -971,6 +818,112 @@ async function handleApi(request, response, url) {
     }
 
     sendJson(response, 200, { sportsPostedResults });
+    return true;
+  }
+
+  if (request.method === "POST" && requestPath === "/api/competitions/add") {
+    const body = await readJson(request);
+    const name = String(body.name || "").trim();
+    if (!name) {
+      sendError(response, 400, "Competition name is required.");
+      return true;
+    }
+    const id = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const competition = {
+      id,
+      name,
+      category: String(body.category || "Education").trim(),
+      type: String(body.type || "Individual").trim(),
+    };
+    competitionsList.push(competition);
+    sendJson(response, 200, { competitionsList, addedId: id });
+    return true;
+  }
+
+  if (request.method === "POST" && requestPath === "/api/competitions/delete") {
+    const body = await readJson(request);
+    const id = String(body.id || "").trim();
+    const idx = competitionsList.findIndex((c) => c.id === id);
+    if (idx >= 0) competitionsList.splice(idx, 1);
+    const kept = competitionFinals.filter((f) => f.competitionId !== id);
+    competitionFinals.length = 0;
+    kept.forEach((f) => competitionFinals.push(f));
+    sendJson(response, 200, { competitionsList, competitionFinals });
+    return true;
+  }
+
+  if (request.method === "POST" && requestPath === "/api/competition/finals/save") {
+    const body = await readJson(request);
+    const competitionId = String(body.competitionId || "").trim();
+    if (!competitionId) {
+      sendError(response, 400, "Competition ID is required.");
+      return true;
+    }
+    const comp = competitionsList.find((c) => c.id === competitionId);
+    const slots = Array.isArray(body.slots) ? body.slots : [];
+    const kept = competitionFinals.filter((f) => f.competitionId !== competitionId);
+    slots.forEach((slot, slotIdx) => {
+      const members = (Array.isArray(slot.members) ? slot.members : [])
+        .filter((m) => String(m.name || "").trim() || String(m.code || "").trim())
+        .map((m) => ({
+          code: String(m.code || "").trim(),
+          name: String(m.name || "").trim(),
+          halqa: String(m.halqa || "").trim(),
+        }));
+      if (members.length) {
+        kept.push({
+          id: `f${competitionId}-${slotIdx}-${Date.now().toString(36)}`,
+          competitionId,
+          competition: comp ? comp.name : competitionId,
+          category: comp ? comp.category : "Education",
+          rank: String(slot.rank || "1st").trim(),
+          members,
+        });
+      }
+    });
+    competitionFinals.length = 0;
+    kept.forEach((f) => competitionFinals.push(f));
+    sendJson(response, 200, { competitionFinals });
+    return true;
+  }
+
+  if (request.method === "POST" && requestPath === "/api/competition/final/save") {
+    const body = await readJson(request);
+    const competition = String(body.competition || "").trim();
+    const category = String(body.category || "").trim();
+    const entries = Array.isArray(body.entries) ? body.entries : [];
+
+    if (!competition) {
+      sendError(response, 400, "Competition name is required.");
+      return true;
+    }
+
+    const kept = competitionResults.filter((r) => r.competition !== competition);
+    entries.forEach((entry) => {
+      if (String(entry.name || "").trim()) {
+        kept.push({
+          category,
+          competition,
+          position: String(entry.position || "").trim(),
+          name: String(entry.name || "").trim(),
+          halqa: String(entry.halqa || "").trim(),
+          points: "",
+        });
+      }
+    });
+    competitionResults.length = 0;
+    kept.forEach((r) => competitionResults.push(r));
+    sendJson(response, 200, { competitionResults });
+    return true;
+  }
+
+  if (request.method === "POST" && requestPath === "/api/competition/final/delete") {
+    const body = await readJson(request);
+    const competition = String(body.competition || "").trim();
+    const kept = competitionResults.filter((r) => r.competition !== competition);
+    competitionResults.length = 0;
+    kept.forEach((r) => competitionResults.push(r));
+    sendJson(response, 200, { competitionResults });
     return true;
   }
 

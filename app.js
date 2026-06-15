@@ -22,19 +22,26 @@ let attendanceMessage = "";
 let attendanceModal = null;
 let registrationSearch = "";
 let registrationHalqaFilter = "All";
+let registrationStatusFilter = "All";
+let registrationPage = 1;
+let registrationPerPage = 50;
 let attendanceReportSearch = "";
 let attendanceReportHalqaFilter = "All";
 let attendanceReportStatusFilter = "All";
+let attendanceReportPage = 1;
+let attendanceReportPerPage = 50;
 let competitionAdminCategoryFilter = "All";
 let competitionAdminSearch = "";
+let competitionsList = [];
+let competitionFinals = [];
+let selectedCompetitionId = null;
+let competitionFinalMsg = "";
 let adminUserSearch = "";
 let adminUserRoleFilter = "All";
 let editingScheduleRow = null;
 let editingAnnouncementRow = null;
 let editingUserRow = null;
 let isSidebarCollapsed = false;
-let avSlideIndex = 0;
-let avTimer = null;
 let judgeMessage = "";
 let educationSelectedCompetition = "Tilawat";
 let educationRosterAdminCompetition = "Tilawat";
@@ -74,22 +81,22 @@ let halqajat = [
 ];
 
 const halqaTajnidReference = {
-  "Peace Village West": { registrations: 34, tajnid: 72 },
-  "Peace Village Center East": { registrations: 41, tajnid: 112 },
-  "Vaughan East": { registrations: 21, tajnid: 88 },
-  "Peace Village Center West": { registrations: 18, tajnid: 82 },
-  "Vaughan North": { registrations: 19, tajnid: 131 },
-  "Woodbridge North": { registrations: 19, tajnid: 142 },
-  "Vaughan South": { registrations: 12, tajnid: 100 },
-  "Peace Village East": { registrations: 15, tajnid: 143 },
-  "Peace Village South East": { registrations: 9, tajnid: 87 },
-  Springside: { registrations: 10, tajnid: 99 },
-  Maple: { registrations: 11, tajnid: 110 },
-  "Kleinburg South": { registrations: 6, tajnid: 68 },
-  "Peace Village South West": { registrations: 7, tajnid: 98 },
-  "Kleinburg North": { registrations: 5, tajnid: 101 },
-  "Jamia Ahmadiyya": { registrations: 2, tajnid: 104 },
-  "Woodbridge South": { registrations: 0, tajnid: 91 },
+  "Peace Village West": { registrations: 48, tajnid: 72 },
+  "Peace Village Center East": { registrations: 58, tajnid: 103 },
+  Maple: { registrations: 50, tajnid: 109 },
+  "Kleinburg South": { registrations: 30, tajnid: 67 },
+  "Vaughan East": { registrations: 33, tajnid: 82 },
+  "Peace Village South East": { registrations: 31, tajnid: 82 },
+  "Peace Village Center West": { registrations: 28, tajnid: 76 },
+  "Woodbridge North": { registrations: 47, tajnid: 138 },
+  "Peace Village South West": { registrations: 28, tajnid: 90 },
+  "Kleinburg North": { registrations: 24, tajnid: 79 },
+  "Vaughan South": { registrations: 28, tajnid: 93 },
+  "Vaughan North": { registrations: 37, tajnid: 126 },
+  Springside: { registrations: 26, tajnid: 90 },
+  "Peace Village East": { registrations: 29, tajnid: 114 },
+  "Woodbridge South": { registrations: 10, tajnid: 76 },
+  "Jamia Ahmadiyya": { registrations: 8, tajnid: 102 },
 };
 
 const zaimUsers = halqajat.map((halqa, index) => {
@@ -149,13 +156,6 @@ const users = [
     role: "sportsAdmin",
     access: "Sports results access",
   },
-  {
-    username: "av",
-    password: "av123",
-    name: "AV Team",
-    role: "av",
-    access: "Projector display access",
-  },
 ];
 
 let dashboardUsers = users.map((user) => ({ ...user }));
@@ -167,7 +167,6 @@ const roleLabels = {
   educationJudge: "Education Judge Portal",
   sportsAdmin: "Sports Results Portal",
   admin: "Admin Portal",
-  av: "AV Display Mode",
 };
 
 let scheduleItems = [
@@ -362,6 +361,8 @@ const sportsPodiumPositions = [
 ];
 let sportsPostedResults = [];
 
+let masterMemberRecords = [];
+let registrationRecords = [];
 let memberRecords = halqajat.flatMap((halqa, halqaIndex) => {
   const baseCode = (halqaIndex + 1) * 1000;
   const registrationTarget = halqaTajnidReference[halqa]?.registrations || 0;
@@ -391,8 +392,9 @@ let attendanceRecords = memberRecords
     checkIn: member.checkIn,
     checkedInBy: "Demo seed",
   }));
+masterMemberRecords = memberRecords.map((member) => ({ ...member, source: member.source || "master" }));
+registrationRecords = memberRecords.filter((member) => member.registered).map((member) => ({ ...member, source: "registration" }));
 
-const avSlides = ["Welcome", "Live Schedule", "Coming Up", "Attendance Live", "Announcements", "Leaderboard", "Winners"];
 
 function loadEducationRubricsFromStorage() {
   try {
@@ -468,69 +470,68 @@ function downloadCsv(filename, headers, rows) {
   URL.revokeObjectURL(url);
 }
 
-function openReportWindow(title, summaryRows, tableHeaders, tableRows) {
-  const reportWindow = window.open("", "_blank", "noopener,noreferrer");
+function printInPage(title, summaryRows, tableHeaders, tableRows) {
+  const generatedAt = new Date().toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 
-  if (!reportWindow) {
-    window.print();
-    return;
-  }
-
-  const generatedAt = new Date().toLocaleString([], {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
   const summaryMarkup = summaryRows
-    .map(
-      ([label, value]) => `
-        <div class="metric">
-          <span>${escapeHtml(label)}</span>
-          <strong>${escapeHtml(value)}</strong>
-        </div>
-      `
-    )
+    .map(([label, value]) => `<div class="ipr-metric"><span>${escapeHtml(String(label))}</span><strong>${escapeHtml(String(value))}</strong></div>`)
     .join("");
-  const headMarkup = tableHeaders.map((header) => `<th>${escapeHtml(header)}</th>`).join("");
+  const headMarkup = tableHeaders.map((h) => `<th>${escapeHtml(h)}</th>`).join("");
   const rowMarkup = tableRows
-    .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
+    .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(String(cell))}</td>`).join("")}</tr>`)
     .join("");
 
-  reportWindow.document.write(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>${escapeHtml(title)}</title>
-        <style>
-          body { margin: 32px; color: #0f172a; font-family: Arial, sans-serif; }
-          h1 { margin: 0 0 6px; font-size: 24px; }
-          .meta { margin-bottom: 22px; color: #475569; }
-          .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 18px 0 24px; }
-          .metric { padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; }
-          .metric span { display: block; color: #64748b; font-size: 12px; text-transform: uppercase; }
-          .metric strong { display: block; margin-top: 6px; font-size: 22px; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th, td { padding: 8px; border: 1px solid #cbd5e1; text-align: left; vertical-align: top; }
-          th { background: #f1f5f9; text-transform: uppercase; font-size: 11px; }
-          @media print { body { margin: 18mm; } button { display: none; } }
-        </style>
-      </head>
-      <body>
-        <h1>${escapeHtml(title)}</h1>
-        <div class="meta">Generated ${escapeHtml(generatedAt)}</div>
-        <div class="metrics">${summaryMarkup}</div>
-        <table>
-          <thead><tr>${headMarkup}</tr></thead>
-          <tbody>${rowMarkup}</tbody>
-        </table>
-        <script>
-          window.addEventListener("load", () => {
-            window.print();
-          });
-        </script>
-      </body>
-    </html>
-  `);
-  reportWindow.document.close();
+  const overlay = document.createElement("div");
+  overlay.id = "ipr-overlay";
+  overlay.innerHTML = `
+    <h1>${escapeHtml(title)}</h1>
+    <p class="ipr-meta">Generated ${escapeHtml(generatedAt)}</p>
+    <div class="ipr-metrics">${summaryMarkup}</div>
+    <table>
+      <thead><tr>${headMarkup}</tr></thead>
+      <tbody>${rowMarkup}</tbody>
+    </table>
+  `;
+
+  const style = document.createElement("style");
+  style.id = "ipr-style";
+  style.textContent = `
+    #ipr-overlay {
+      display: none;
+      font-family: Arial, sans-serif;
+      color: #0f172a;
+      padding: 24px;
+    }
+    #ipr-overlay h1 { margin: 0 0 4px; font-size: 22px; }
+    #ipr-overlay .ipr-meta { margin: 0 0 16px; color: #64748b; font-size: 12px; }
+    #ipr-overlay .ipr-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+    #ipr-overlay .ipr-metric { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    #ipr-overlay .ipr-metric span { display: block; font-size: 11px; text-transform: uppercase; color: #64748b; }
+    #ipr-overlay .ipr-metric strong { display: block; font-size: 20px; margin-top: 4px; }
+    #ipr-overlay table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    #ipr-overlay th, #ipr-overlay td { padding: 7px 8px; border: 1px solid #cbd5e1; text-align: left; }
+    #ipr-overlay th { background: #f1f5f9; text-transform: uppercase; font-size: 11px; font-weight: 700; }
+    @media print {
+      body > *:not(#ipr-overlay) { display: none !important; }
+      #ipr-overlay { display: block !important; }
+    }
+  `;
+
+  document.head.appendChild(style);
+  document.body.appendChild(overlay);
+
+  const cleanup = () => {
+    style.remove();
+    overlay.remove();
+    window.removeEventListener("afterprint", cleanup);
+  };
+  window.addEventListener("afterprint", cleanup);
+
+  window.print();
+}
+
+function openReportWindow(title, summaryRows, tableHeaders, tableRows) {
+  printInPage(title, summaryRows, tableHeaders, tableRows);
 }
 
 function applyBootstrapData(data) {
@@ -540,6 +541,10 @@ function applyBootstrapData(data) {
   announcements = data.announcements || announcements;
   halqaRankings = data.halqaRankings || halqaRankings;
   competitionResults = data.competitionResults || competitionResults;
+  competitionsList = data.competitionsList || competitionsList;
+  competitionFinals = data.competitionFinals || competitionFinals;
+  masterMemberRecords = data.masterMemberRecords || data.memberRecords || masterMemberRecords;
+  registrationRecords = data.registrationRecords || data.memberRecords?.filter((member) => member.registered) || registrationRecords;
   memberRecords = data.memberRecords || memberRecords;
   attendanceRecords = data.attendanceRecords || attendanceRecords;
   educationJudgeResults = data.educationJudgeResults || educationJudgeResults;
@@ -597,16 +602,15 @@ window.addEventListener("hashchange", syncPublicHashNavigation);
 const navItems = {
   public: ["Overview", "Schedule", "Announcements", "Locations", "Competitions", "Help"],
   zaim: ["Dashboard", "Members", "Attendance", "Rankings"],
-  attendance: ["Check-In Station", "Activity Log", "Issues"],
-  educationJudge: ["Competition Setup", "Score Entry", "Posted Results", "Final Positions"],
-  sportsAdmin: ["Result Entry", "Published Results", "Sports Standings", "Closing Ceremony Sheet"],
-  admin: ["Overview", "Schedule Manager", "Announcements", "Registrations", "Attendance Reports", "Competitions", "Users"],
-  av: ["Display"],
+  attendance: ["Check-In Station", "Manual Entry", "Activity Log", "Issues"],
+  educationJudge: ["Final Positions"],
+  sportsAdmin: ["Final Positions"],
+  admin: ["Overview", "Schedule Manager", "Announcements", "Registrations", "Attendance Input", "Attendance Reports", "Competitions", "Users"],
 };
 
 const adminNavGroups = [
   { label: "Manage", items: ["Overview", "Schedule Manager", "Announcements"] },
-  { label: "Operations", items: ["Registrations", "Attendance Reports", "Competitions"] },
+  { label: "Operations", items: ["Registrations", "Attendance Input", "Attendance Reports", "Competitions"] },
   { label: "Admin", items: ["Users"] },
 ];
 
@@ -626,6 +630,7 @@ const navIconMap = {
   Registrations: "user",
   Attendance: "chart",
   "Check-In Station": "scan",
+  "Manual Entry": "user",
   "Activity Log": "clock",
   Issues: "alert",
   "Attendance Details": "chart",
@@ -643,8 +648,10 @@ const navIconMap = {
   "Sports Standings": "chart",
   "Closing Ceremony Sheet": "award",
   "Schedule Manager": "calendar",
+  "Attendance Input": "scan",
   "Attendance Reports": "chart",
   Competitions: "trophy",
+  "Final Positions": "trophy",
   Users: "users",
   "Attendance Live": "chart",
   Leaderboard: "trophy",
@@ -671,7 +678,7 @@ function iconSvg(name) {
     map: '<path d="M9 18 3 21V6l6-3 6 3 6-3v15l-6 3-6-3Z"></path><path d="M9 3v15"></path><path d="M15 6v15"></path>',
     phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.4 2.1L8.1 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.6 1.9Z"></path>',
   };
-  return `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.grid}</svg>`;
+  return `<svg class="nav-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">${icons[name] || icons.grid}</svg>`;
 }
 
 const panels = {
@@ -765,46 +772,16 @@ const panels = {
   ],
   educationJudge: [
     {
-      size: "large",
-      title: "Education Competition Setup",
-      body: "Define the competition type and rubric before scoring begins. Rubrics lock after the first score is posted.",
-    },
-    {
       size: "full",
-      title: "Education Score Entry",
-      body: "Judges select the participant, enter rubric marks, and move quickly through the queue.",
-    },
-    {
-      size: "medium",
-      title: "Posted Education Results",
-      body: "Official posted score entries from education judges.",
-    },
-    {
-      size: "medium",
-      title: "Education Final Positions",
-      body: "Top three positions are calculated from cumulative posted scores.",
+      title: "Final Positions",
+      body: "Enter official final positions for education competitions. Search member code to auto-fill name and halqa.",
     },
   ],
   sportsAdmin: [
     {
       size: "full",
-      title: "Sports Result Entry",
-      body: "Assign podium winners, attach participant names, and preview the stage announcement before publishing.",
-    },
-    {
-      size: "large",
-      title: "Published Sports Results",
-      body: "Published podium results with the names that should be called on stage.",
-    },
-    {
-      size: "large",
-      title: "Sports Standings",
-      body: "Halqa points table calculated from published sports podium results.",
-    },
-    {
-      size: "large",
-      title: "Closing Ceremony Sheet",
-      body: "Stage-ready list of sports winners and associated participants for the MC and ceremony team.",
+      title: "Final Positions",
+      body: "Enter official final positions for sports competitions. Multiple members per position supported for team events.",
     },
   ],
   admin: [
@@ -834,6 +811,11 @@ const panels = {
     },
     {
       size: "full",
+      title: "Admin Attendance Input",
+      body: "Check in members by code, name, or badge scan.",
+    },
+    {
+      size: "full",
       title: "Admin Attendance Reports",
       body: "Review attendance totals, halqa performance, and detailed check-in records.",
     },
@@ -852,18 +834,6 @@ const panels = {
       title: "Google Sheets Data",
       body: "Registrations, attendance, schedule, competitions, and users can be linked to separate Sheet tabs.",
       metrics: [["Ready", "Integration plan"]],
-    },
-  ],
-  av: [
-    {
-      size: "full",
-      title: "Projector Slideshow",
-      body: "AV mode will use large full-screen slides for now/next schedule, live attendance, rankings, winners, and announcements.",
-      metrics: [
-        ["16:9", "Screen layout"],
-        ["Public", "Safe data only"],
-        ["Auto", "Slide rotation"],
-      ],
     },
   ],
 };
@@ -1380,6 +1350,28 @@ function parseTodayTime(timeText) {
   return date;
 }
 
+function to24h(timeText) {
+  const m = String(timeText || "").match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return timeText || "";
+  let h = +m[1];
+  const min = m[2];
+  const p = m[3].toUpperCase();
+  if (p === "AM" && h === 12) h = 0;
+  if (p === "PM" && h !== 12) h += 12;
+  return `${String(h).padStart(2, "0")}:${min}`;
+}
+
+function to12h(timeText) {
+  const m = String(timeText || "").match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return timeText || "";
+  let h = +m[1];
+  const min = m[2];
+  const p = h >= 12 ? "PM" : "AM";
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${h}:${min} ${p}`;
+}
+
 function formatDurationLabel(milliseconds) {
   const totalMinutes = Math.max(0, Math.ceil(milliseconds / 60000));
 
@@ -1394,6 +1386,39 @@ function formatDurationLabel(milliseconds) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return minutes ? `Starts in ${hours}h ${minutes}m` : `Starts in ${hours}h`;
+}
+
+function getPublicPrayerTimes() {
+  const prayerNames = [
+    ["Fajar", ["fajar", "fajr"]],
+    ["Zuhr", ["zuhr", "zuhar", "dhuhr", "dhuhr"]],
+    ["Asar", ["asar", "asr"]],
+    ["Maghrib", ["maghrib"]],
+    ["Isha", ["isha", "esha"]],
+  ];
+
+  const linkedPrayerTimes = prayerNames
+    .map(([label, aliases]) => {
+      const scheduleItem = scheduleItems.find((item) => {
+        const text = `${item.title || ""} ${item.location || ""}`.toLowerCase();
+        return aliases.some((alias) => text.includes(alias));
+      });
+
+      return scheduleItem?.start ? [label, scheduleItem.start] : null;
+    })
+    .filter(Boolean);
+
+  if (linkedPrayerTimes.length) {
+    return linkedPrayerTimes;
+  }
+
+  return [
+    ["Fajar", "4:30 AM"],
+    ["Zuhr", "2:00 PM"],
+    ["Asar", "2:00 PM"],
+    ["Maghrib", "9:15 PM"],
+    ["Isha", "9:15 PM"],
+  ];
 }
 
 function getPrayerTimeline(prayerTimes) {
@@ -1489,6 +1514,14 @@ function getPostedTimeValue(result, index) {
 }
 
 function getLatestCompetitionResultSet() {
+  const finalPositionPosts = competitionFinals.map((entry, index) => ({
+    source: entry.category || "Competition",
+    key: entry.competition,
+    competitionId: entry.competitionId,
+    postedAt: entry.postedAt || "",
+    timeValue: 10_000 + index,
+    type: "final",
+  }));
   const educationPosts = educationJudgeResults.map((result, index) => ({
     source: "Education",
     key: result.competition,
@@ -1500,11 +1533,36 @@ function getLatestCompetitionResultSet() {
     key: result.sport,
     postedAt: result.postedAt,
     timeValue: getPostedTimeValue(result, index),
+    type: "posted",
   }));
-  const latestPost = [...educationPosts, ...sportsPosts].sort((a, b) => b.timeValue - a.timeValue)[0];
+  const latestPost = [...finalPositionPosts, ...educationPosts, ...sportsPosts].sort((a, b) => b.timeValue - a.timeValue)[0];
 
   if (!latestPost?.key) {
     return null;
+  }
+
+  if (latestPost.type === "final") {
+    const entries = competitionFinals.filter((entry) => entry.competitionId === latestPost.competitionId);
+    const results = entries
+      .flatMap((entry) =>
+        entry.members.map((member) => ({
+          name: member.name,
+          halqa: member.halqa,
+          score: "",
+          position: entry.rank,
+          rank: getPositionRank(entry.rank),
+        }))
+      )
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, 3);
+
+    return {
+      source: latestPost.source,
+      title: latestPost.key,
+      label: `${results.length} final position${results.length === 1 ? "" : "s"}`,
+      postedAt: latestPost.postedAt,
+      results,
+    };
   }
 
   if (latestPost.source === "Education") {
@@ -1584,7 +1642,7 @@ function renderLiveCompetitionUpdates() {
           </div>
           <em class="completed">Standby</em>
         </div>
-        <p class="competition-subline">This widget updates only after education judges or sports admins post results.</p>
+        <p class="competition-subline">This widget updates after final positions or posted results are saved.</p>
       </div>
     `;
   }
@@ -1619,7 +1677,18 @@ function renderLiveCompetitionUpdates() {
   `;
 }
 
+function getHelpDeskLocation() {
+  const helpItem = scheduleItems.find((item) => {
+    const text = `${item.title || ""} ${item.location || ""}`.toLowerCase();
+    return text.includes("help") || text.includes("information") || text.includes("registration");
+  });
+
+  return helpItem?.location || helpItem?.title || "Main Entrance";
+}
+
 function renderPublicHelp() {
+  const helpDeskLocation = getHelpDeskLocation();
+
   return `
     <div class="help-grid">
       <article class="public-card emergency-card">
@@ -1634,7 +1703,7 @@ function renderPublicHelp() {
         <span class="public-card-icon teal">${iconSvg("map")}</span>
         <div>
           <h3>Help Desk</h3>
-          <strong>Main Entrance</strong>
+          <strong>${helpDeskLocation}</strong>
           <p>Questions, lost items, and visitor support.</p>
         </div>
       </article>
@@ -1654,13 +1723,29 @@ function getLiveServiceItems(prayerTimes) {
     return title.includes("lunch") && start && end && start.getTime() <= now.getTime() && end.getTime() > now.getTime();
   });
 
+  const resultsCount =
+    educationJudgeResults.length +
+    sportsPostedResults.length +
+    competitionFinals.reduce((count, entry) => count + entry.members.length, 0) +
+    competitionResults.length;
+  const foodItem = scheduleItems.find((item) => {
+    const text = `${item.title || ""} ${item.location || ""}`.toLowerCase();
+    return text.includes("lunch") || text.includes("dinner") || text.includes("food") || text.includes("dining");
+  });
+
   return [
     ["Registration Desk", "Open", `${attendanceRecords.length} checked in today`, "open", "user"],
-    ["Food Service", lunchLive ? "Live" : "Open", lunchLive ? "Lunch service active" : "Dining support available", lunchLive ? "busy" : "open", "list"],
+    [
+      "Food Service",
+      lunchLive ? "Live" : foodItem ? "Scheduled" : "Open",
+      lunchLive ? `${foodItem?.title || "Meal service"} active` : foodItem ? `${foodItem.title} ${getTimeUntilLabel(foodItem.start, "soon")}` : "Dining support available",
+      lunchLive ? "busy" : "open",
+      "list",
+    ],
     ["Program Desk", liveItem.title ? "Live" : "Open", liveItem.title ? `${liveItem.title} at ${liveItem.location}` : "Ready for program updates", liveItem.title ? "busy" : "open", "award"],
     ["Prayer Support", "Live", `Next ${prayerTimeline.nextPrayer?.name || "prayer"} ${prayerTimeline.nextPrayer?.time || ""}`, "open", "clock"],
     ["Next Movement", nextItem.title ? "Soon" : "Open", nextItem.title ? `${nextItem.title} ${getTimeUntilLabel(nextItem.start, "soon")}` : "No upcoming item", nextItem.title ? "busy" : "open", "map"],
-    ["Results Desk", educationJudgeResults.length || sportsPostedResults.length ? "Updated" : "Standby", `${educationJudgeResults.length + sportsPostedResults.length} posted result entries`, educationJudgeResults.length || sportsPostedResults.length ? "open" : "busy", "trophy"],
+    ["Results Desk", resultsCount ? "Updated" : "Standby", `${resultsCount} posted result entries`, resultsCount ? "open" : "busy", "trophy"],
   ].slice(0, 4);
 }
 
@@ -1669,12 +1754,17 @@ function getLiveWeatherSnapshot() {
   const temp = hour < 7 ? 18 : hour < 12 ? 24 : hour < 18 ? 31 : 26;
   const condition = hour < 7 ? "Cool Morning" : hour < 18 ? "Clear Sky" : "Mild Evening";
   const outdoorOpen = temp >= 16 && temp <= 34;
+  const outdoorItem = scheduleItems.find((item) => {
+    const text = `${item.title || ""} ${item.location || ""}`.toLowerCase();
+    return text.includes("sport") || text.includes("field") || text.includes("ground") || text.includes("outdoor");
+  });
+  const outdoorStatus = outdoorItem ? getComputedScheduleStatus(outdoorItem) : "";
 
   return {
     temp,
     condition,
-    status: outdoorOpen ? "Sports Ground Open" : "Outdoor Advisory",
-    detail: outdoorOpen ? "Outdoor activities available" : "Check with event staff",
+    status: outdoorItem ? `${outdoorItem.location || outdoorItem.title} ${outdoorStatus}` : outdoorOpen ? "Sports Ground Open" : "Outdoor Advisory",
+    detail: outdoorItem ? outdoorItem.title : outdoorOpen ? "Outdoor activities available" : "Check with event staff",
     forecast: [
       ["Morning", "25°C"],
       ["Afternoon", "31°C"],
@@ -1707,17 +1797,11 @@ function renderPublicOverview() {
     return priority === "important" || priority === "critical";
   }).length;
   const newAnnouncementCount = announcements.filter(isNewAnnouncement).length;
-  const prayerTimes = [
-    ["Fajar", "4:30 AM"],
-    ["Zuhr", "2:00 PM"],
-    ["Asar", "2:00 PM"],
-    ["Maghrib", "9:15 PM"],
-    ["Isha", "9:15 PM"],
-  ];
+  const prayerTimes = getPublicPrayerTimes();
   const services = getLiveServiceItems(prayerTimes);
   const weather = getLiveWeatherSnapshot();
-  const highlights = getLiveHighlights();
   const latestCompetition = getLatestCompetitionResultSet();
+  const helpDeskLocation = getHelpDeskLocation();
 
   return `
     <section class="public-live-card" id="public-live-now">
@@ -1894,7 +1978,7 @@ function renderPublicOverview() {
               <span>${iconSvg("map")}</span>
               <div>
                 <p>Help Desk</p>
-                <strong>Main Entrance</strong>
+                <strong>${helpDeskLocation}</strong>
               </div>
               <a class="widget-nav-link" href="#public-locations" data-section="Locations">${iconSvg("map")} Get Directions</a>
             </div>
@@ -1904,15 +1988,6 @@ function renderPublicOverview() {
       </article>
     </section>
 
-    <section class="public-card highlights-card">
-      <div class="section-heading">
-        <h3>Today's Highlights</h3>
-        <span>Featured</span>
-      </div>
-      <div class="highlight-list">
-        ${highlights.map((highlight) => `<span>${highlight}</span>`).join("")}
-      </div>
-    </section>
   `;
 }
 
@@ -1928,16 +2003,16 @@ function renderAdminOverview() {
   const chartPoints = trendValues
     .map((value, index) => `${index * 52 + 12},${112 - (value / maxTrend) * 92}`)
     .join(" ");
+  const totalCompetitors = registrationStats.total || 1;
   const competitionBars = [
-    ["Education Results", educationJudgeResults.length || 8, 16],
-    ["Sports Results", sportsPostedResults.length || 6, 13],
-    ["Published Winners", competitionResults.length || 5, 12],
+    ["Education Results", educationJudgeResults.length, totalCompetitors],
+    ["Sports Results", sportsPostedResults.length, totalCompetitors],
+    ["Published Winners", competitionResults.length, totalCompetitors],
   ];
 
   return `
     <section class="overview-hero">
       <div>
-        <p class="eyebrow">Live Operations</p>
         <h2>Overview</h2>
         <p>Welcome back. Here is what is happening across registration, attendance, announcements, and competitions.</p>
       </div>
@@ -1945,37 +2020,26 @@ function renderAdminOverview() {
     </section>
 
     <section class="kpi-grid">
-      <article class="kpi-card">
-        <span class="kpi-icon emerald">${iconSvg("users")}</span>
-        <div>
-          <strong>${registrationStats.total}</strong>
-          <span>Total Registrations</span>
-          <em>+12% from last update</em>
-        </div>
+      <article class="kpi-card kpi-emerald">
+        <strong>${registrationStats.total}</strong>
+        <span>Total Registrations</span>
+        <em>${registrationStats.total - registrationStats.attended} not yet checked in</em>
       </article>
-      <article class="kpi-card">
-        <span class="kpi-icon blue">${iconSvg("chart")}</span>
-        <div>
-          <strong>${registrationStats.attended}</strong>
-          <span>Attendance</span>
-          <em>${attendanceRate}% checked in</em>
-        </div>
+      <article class="kpi-card kpi-blue">
+        <strong>${registrationStats.attended}</strong>
+        <span>Attendance</span>
+        <em>${attendanceRate}% checked in</em>
+        <div class="kpi-progress"><div class="kpi-progress-fill" style="width:${attendanceRate}%"></div></div>
       </article>
-      <article class="kpi-card">
-        <span class="kpi-icon violet">${iconSvg("trophy")}</span>
-        <div>
-          <strong>${competitionCount}</strong>
-          <span>Competitions</span>
-          <em>No change</em>
-        </div>
+      <article class="kpi-card kpi-violet">
+        <strong>${competitionCount}</strong>
+        <span>Competitions</span>
+        <em>${competitionCount > 0 ? `${competitionCount} result${competitionCount !== 1 ? "s" : ""} logged` : "None logged yet"}</em>
       </article>
-      <article class="kpi-card">
-        <span class="kpi-icon amber">${iconSvg("megaphone")}</span>
-        <div>
-          <strong>${announcements.length}</strong>
-          <span>Announcements</span>
-          <em>${recentAnnouncements.length} recent</em>
-        </div>
+      <article class="kpi-card kpi-amber">
+        <strong>${announcements.length}</strong>
+        <span>Announcements</span>
+        <em>${recentAnnouncements.length} recent</em>
       </article>
     </section>
 
@@ -2054,6 +2118,8 @@ function renderAdminOverview() {
 }
 
 function renderHalqaRankings() {
+  const rows = getComputedHalqaRankings();
+
   return `
     <div class="ranking-table" role="table" aria-label="Halqa position report">
       <div class="ranking-row ranking-head" role="row">
@@ -2064,7 +2130,7 @@ function renderHalqaRankings() {
         <span>Sports</span>
         <span>Total</span>
       </div>
-      ${halqaRankings
+      ${rows
         .map(
           (item) => `
             <div class="ranking-row" role="row">
@@ -2080,6 +2146,60 @@ function renderHalqaRankings() {
         .join("")}
     </div>
   `;
+}
+
+function addHalqaPoints(scores, halqa, points) {
+  if (!halqa || !scores[halqa]) {
+    return;
+  }
+
+  scores[halqa] += Number(points || 0);
+}
+
+function getComputedHalqaRankings() {
+  const attendanceScores = Object.fromEntries(halqajat.map((halqa) => [halqa, 0]));
+  const educationScores = Object.fromEntries(halqajat.map((halqa) => [halqa, 0]));
+  const sportsScores = Object.fromEntries(halqajat.map((halqa) => [halqa, 0]));
+
+  halqajat.forEach((halqa) => {
+    const registered = memberRecords.filter((member) => member.halqa === halqa && member.registered).length;
+    const attended = memberRecords.filter((member) => member.halqa === halqa && isMemberPresent(member)).length;
+    attendanceScores[halqa] = registered ? Math.round((attended / registered) * 100) : 0;
+  });
+
+  educationJudgeResults.forEach((result) => {
+    addHalqaPoints(educationScores, result.halqa, Number(result.total || 0));
+  });
+
+  sportsPostedResults.forEach((result) => {
+    addHalqaPoints(sportsScores, result.halqa, Number(result.points || positionPoints[result.position] || 0));
+  });
+
+  competitionFinals.forEach((entry) => {
+    const targetScores = entry.category === "Sports" ? sportsScores : educationScores;
+    const points = positionPoints[entry.rank] || Math.max(0, 11 - getPositionRank(entry.rank));
+    entry.members.forEach((member) => addHalqaPoints(targetScores, member.halqa, points));
+  });
+
+  competitionResults.forEach((result) => {
+    const targetScores = result.category === "Sports" ? sportsScores : educationScores;
+    addHalqaPoints(targetScores, result.halqa, positionPoints[result.position] || Math.max(0, 11 - getPositionRank(result.position)));
+  });
+
+  const computedRows = halqajat.map((halqa) => ({
+    halqa,
+    attendance: attendanceScores[halqa],
+    education: educationScores[halqa],
+    sports: sportsScores[halqa],
+    total: attendanceScores[halqa] + educationScores[halqa] + sportsScores[halqa],
+  }));
+
+  const hasLiveScores = computedRows.some((row) => row.attendance || row.education || row.sports);
+  const sourceRows = hasLiveScores ? computedRows : halqaRankings;
+
+  return [...sourceRows]
+    .sort((a, b) => b.total - a.total || b.attendance - a.attendance || a.halqa.localeCompare(b.halqa))
+    .map((item, index) => ({ ...item, rank: index + 1 }));
 }
 
 function getPositionRank(position) {
@@ -2191,26 +2311,44 @@ function buildCompetitionLeaderboardGroups() {
     groups.set(key, group);
   });
 
-  if (!groups.size) {
-    competitionResults.forEach((result) => {
-      const key = `${result.category}|${result.competition}`;
-      const group = groups.get(key) || {
-        category: result.category,
-        competition: result.competition,
-        postedAt: "",
-        winners: [],
-      };
-
+  competitionFinals.forEach((entry) => {
+    const key = `${entry.category}|${entry.competition}`;
+    const group = groups.get(key) || {
+      category: entry.category,
+      competition: entry.competition,
+      postedAt: entry.postedAt || "",
+      winners: [],
+    };
+    entry.members.forEach((member) => {
       group.winners.push({
-        position: result.position,
-        rank: getPositionRank(result.position),
-        name: result.name,
-        halqa: result.halqa,
+        position: entry.rank,
+        rank: getPositionRank(entry.rank),
+        name: member.name,
+        halqa: member.halqa || "",
         score: "",
       });
-      groups.set(key, group);
     });
-  }
+    groups.set(key, group);
+  });
+
+  competitionResults.forEach((result) => {
+    const key = `${result.category}|${result.competition}`;
+    const group = groups.get(key) || {
+      category: result.category,
+      competition: result.competition,
+      postedAt: "",
+      winners: [],
+    };
+
+    group.winners.push({
+      position: result.position,
+      rank: getPositionRank(result.position),
+      name: result.name,
+      halqa: result.halqa,
+      score: "",
+    });
+    groups.set(key, group);
+  });
 
   return Array.from(groups.values())
     .map((group) => ({
@@ -2675,14 +2813,19 @@ function getAttendanceMatches() {
 }
 
 function getAttendanceStats() {
-  const registeredMembers = memberRecords.filter((member) => member.registered);
-  const presentMembers = registeredMembers.filter((member) => isMemberPresent(member));
+  const registeredMembers = registrationRecords.length ? registrationRecords : memberRecords.filter((member) => member.registered);
+  const presentMembers = memberRecords.filter((member) => isMemberPresent(member));
+  const registeredCodes = new Set(registeredMembers.map((member) => normalizeAttendanceCode(member.code)).filter(Boolean));
+  const registeredPresentMembers = presentMembers.filter((member) => registeredCodes.has(normalizeAttendanceCode(member.code)));
+  const unregisteredPresentMembers = presentMembers.filter((member) => !member.registered);
 
   return {
     checkedIn: presentMembers.length,
-    pending: Math.max(registeredMembers.length - presentMembers.length, 0),
-    rate: registeredMembers.length ? Math.round((presentMembers.length / registeredMembers.length) * 100) : 0,
+    pending: Math.max(registeredMembers.length - registeredPresentMembers.length, 0),
+    rate: registeredMembers.length ? Math.round((registeredPresentMembers.length / registeredMembers.length) * 100) : 0,
     total: registeredMembers.length,
+    totalTajnid: getTotalTajnid(),
+    unregisteredCheckedIn: unregisteredPresentMembers.length,
   };
 }
 
@@ -2734,6 +2877,21 @@ function reconcileAttendanceState() {
       checkIn: member.checkIn || attendanceRecord?.checkIn || "",
     };
   });
+
+  attendanceRecords.forEach((record) => {
+    const hasMember = memberRecords.some((member) => normalizeAttendanceCode(member.code) === normalizeAttendanceCode(record.code));
+    if (!hasMember) {
+      memberRecords.push({
+        code: record.code,
+        name: record.name,
+        halqa: record.halqa,
+        registered: Boolean(record.registered),
+        attended: true,
+        checkIn: record.checkIn,
+        source: record.source || "walk-in",
+      });
+    }
+  });
 }
 
 function findAttendanceLookupMember(query) {
@@ -2758,8 +2916,22 @@ function getCurrentCheckInTime() {
   });
 }
 
-async function checkInMember(code) {
-  const member = memberRecords.find((record) => record.code === code);
+async function checkInMember(code, manualMember = null) {
+  const normalizedCode = normalizeAttendanceCode(code || manualMember?.code);
+  let member = memberRecords.find((record) => normalizeAttendanceCode(record.code) === normalizedCode);
+
+  if (!member && manualMember?.name && manualMember?.halqa) {
+    member = {
+      code: normalizedCode || `WALK-${Date.now().toString(36)}`,
+      name: manualMember.name,
+      halqa: manualMember.halqa,
+      phone: manualMember.phone || "",
+      registered: false,
+      attended: false,
+      checkIn: "",
+      source: normalizedCode ? "manual" : "walk-in",
+    };
+  }
 
   if (!member) {
     attendanceMessage = "Member was not found.";
@@ -2775,11 +2947,13 @@ async function checkInMember(code) {
     const data = await apiRequest("/api/attendance/check-in", {
       method: "POST",
       body: JSON.stringify({
-        code,
+        code: member.code,
+        member,
         checkedInBy: currentUser?.name || "Attendance Team",
       }),
     });
 
+    masterMemberRecords = data.masterMemberRecords || masterMemberRecords;
     memberRecords = data.memberRecords;
     attendanceRecords = data.attendanceRecords;
     reconcileAttendanceState();
@@ -2803,12 +2977,18 @@ async function checkInMember(code) {
   member.attended = true;
   member.checkIn = checkIn;
 
+  if (!memberRecords.some((record) => normalizeAttendanceCode(record.code) === normalizeAttendanceCode(member.code))) {
+    memberRecords.push(member);
+  }
+
   attendanceRecords.unshift({
     code: member.code,
     name: member.name,
     halqa: member.halqa,
     checkIn,
     checkedInBy: currentUser?.name || "Attendance Team",
+    registered: Boolean(member.registered),
+    source: member.source || (member.registered ? "registered" : "unregistered"),
   });
 
   attendanceMessage = `${member.name} checked in successfully.`;
@@ -2839,7 +3019,7 @@ async function confirmAttendanceModalCheckIn() {
     return;
   }
 
-  const member = memberRecords.find((record) => String(record.code) === String(attendanceModal.code));
+  const member = memberRecords.find((record) => normalizeAttendanceCode(record.code) === normalizeAttendanceCode(attendanceModal.code));
 
   if (!member) {
     attendanceModal = { type: "not-found", title: "Member Not Found", message: "This member could not be found." };
@@ -2848,7 +3028,7 @@ async function confirmAttendanceModalCheckIn() {
   }
 
   await checkInMember(member.code);
-  const refreshedMember = memberRecords.find((record) => String(record.code) === String(member.code)) || member;
+  const refreshedMember = memberRecords.find((record) => normalizeAttendanceCode(record.code) === normalizeAttendanceCode(member.code)) || member;
   attendanceModal = {
     type: "success",
     code: refreshedMember.code,
@@ -2870,7 +3050,7 @@ function renderAttendanceModal() {
   }
 
   const member = attendanceModal.code
-    ? memberRecords.find((record) => String(record.code) === String(attendanceModal.code))
+    ? memberRecords.find((record) => normalizeAttendanceCode(record.code) === normalizeAttendanceCode(attendanceModal.code))
     : null;
   const modalClass = `attendance-modal-card modal-${attendanceModal.type}`;
 
@@ -2880,10 +3060,7 @@ function renderAttendanceModal() {
         <article class="${modalClass}">
           <h3>${attendanceModal.title}</h3>
           <p>${attendanceModal.message}</p>
-          <div class="attendance-modal-actions">
-            <button class="secondary-button attendance-modal-close" type="button">Close</button>
-            <button class="primary-button attendance-focus-search" type="button">Search Again</button>
-          </div>
+          ${renderManualWalkInForm("manualWalkInForm")}
         </article>
       </div>
     `;
@@ -2896,25 +3073,44 @@ function renderAttendanceModal() {
   const attendanceRecord = getAttendanceRecordForMember(member.code) || {};
   const alreadyCheckedIn = attendanceModal.type === "duplicate";
   const isSuccess = attendanceModal.type === "success";
+  const isAdminEdit = attendanceModal.type === "admin-edit";
+  const present = isMemberPresent(member);
+
+  const eyebrow = isSuccess
+    ? "Attendance Recorded"
+    : isAdminEdit
+    ? "Admin — Member Record"
+    : alreadyCheckedIn
+    ? "Already Checked In"
+    : "Confirm Attendance";
 
   return `
     <div class="attendance-modal-backdrop" role="dialog" aria-modal="true">
       <article class="${modalClass}">
-        <p class="section-eyebrow">${isSuccess ? "Attendance Recorded" : alreadyCheckedIn ? "Already Checked In" : "Confirm Attendance"}</p>
+        <p class="section-eyebrow">${eyebrow}</p>
         <h3>${member.name}</h3>
         <div class="attendance-member-card">
           <span class="member-photo-placeholder">${String(member.name || "M").slice(0, 1).toUpperCase()}</span>
           <div>
             <strong>Code: ${member.code}</strong>
             <span>Halqa: ${member.halqa}</span>
-            <span>Status: ${isMemberPresent(member) ? "Present" : "Pending"}</span>
+            <span>Registered: ${member.registered ? "Yes" : "No"}</span>
+            <span>Status: ${present ? "Present" : "Pending"}</span>
             ${(getMemberCheckIn(member) || attendanceModal.checkIn) ? `<span>Checked In: ${getMemberCheckIn(member) || attendanceModal.checkIn}</span>` : ""}
             ${attendanceRecord.checkedInBy ? `<span>Desk: ${attendanceRecord.checkedInBy}</span>` : ""}
           </div>
         </div>
         <div class="attendance-modal-actions">
           ${
-            attendanceModal.type === "confirm"
+            isAdminEdit
+              ? `
+                <button class="secondary-button attendance-modal-close" type="button">Close</button>
+                ${present
+                  ? `<button class="danger-button admin-undo-checkin-button" type="button">Undo Check-in</button>`
+                  : `<button class="primary-button attendance-confirm-button" type="button">Check In Now</button>`
+                }
+              `
+              : attendanceModal.type === "confirm"
               ? `
                 <button class="secondary-button attendance-modal-close" type="button">Cancel</button>
                 <button class="secondary-button attendance-issue-button" type="button">Report Issue</button>
@@ -2925,6 +3121,55 @@ function renderAttendanceModal() {
         </div>
       </article>
     </div>
+  `;
+}
+
+function renderManualWalkInForm(id = "manualWalkInForm", compact = false) {
+  return `
+    <form class="manager-form compact-manager manual-walkin-form${compact ? " is-compact" : ""}" id="${id}">
+      <label class="field">
+        <span>Member Code</span>
+        <input name="code" value="${escapeAttribute(attendanceSearch)}" placeholder="Optional if unknown" />
+      </label>
+      <label class="field">
+        <span>Full Name</span>
+        <input name="name" required />
+      </label>
+      <label class="field">
+        <span>Halqa</span>
+        <select name="halqa" required>
+          <option value="">Select halqa</option>
+          ${halqajat.map((halqa) => `<option>${escapeHtml(halqa)}</option>`).join("")}
+        </select>
+      </label>
+      <label class="field">
+        <span>Phone / Notes</span>
+        <input name="phone" placeholder="Optional" />
+      </label>
+      <div class="attendance-modal-actions">
+        ${compact ? "" : `<button class="secondary-button attendance-modal-close" type="button">Cancel</button>`}
+        <button class="primary-button" type="submit">Add Walk-In & Check In</button>
+      </div>
+    </form>
+  `;
+}
+
+function renderManualWalkInPage() {
+  return `
+    <section class="attendance-station-shell">
+      <div class="attendance-station-hero compact">
+        <div>
+          <p class="section-eyebrow">Manual Entry</p>
+          <h2>Member Not In System</h2>
+          <span>Add a walk-in when the member code does not match the master list or is unknown.</span>
+        </div>
+      </div>
+
+      <section class="attendance-checkin-panel">
+        ${renderManualWalkInForm("manualWalkInPageForm", true)}
+      </section>
+      ${renderAttendanceModal()}
+    </section>
   `;
 }
 
@@ -2945,7 +3190,10 @@ function renderAttendanceCheckIn() {
 
       <div class="attendance-station-stats">
         <div><span>Checked In</span><strong>${stats.checkedIn}</strong></div>
-        <div><span>Pending</span><strong>${stats.pending}</strong></div>
+        <div><span>Pre-Registered</span><strong>${stats.total}</strong></div>
+        <div><span>Total Tajnid</span><strong>${stats.totalTajnid}</strong></div>
+        <div><span>Not Registered Checked In</span><strong>${stats.unregisteredCheckedIn}</strong></div>
+        <div><span>Pending Registered</span><strong>${stats.pending}</strong></div>
         <div><span>Attendance Rate</span><strong>${stats.rate}%</strong></div>
       </div>
 
@@ -2971,7 +3219,7 @@ function renderAttendanceCheckIn() {
                       <button class="attendance-candidate attendance-open-member" data-code="${member.code}" type="button">
                         <strong>${member.name}</strong>
                         <span>${member.code} - ${member.halqa}</span>
-                        <em>${isMemberPresent(member) ? `Present ${getMemberCheckIn(member)}` : "Pending"}</em>
+                        <em>${isMemberPresent(member) ? `Present ${getMemberCheckIn(member)}` : member.registered ? "Pre-registered" : "Not pre-registered"}</em>
                       </button>
                     `
                   )
@@ -3109,169 +3357,21 @@ function getNextScheduleItem() {
   );
 }
 
-function getLatestWinner() {
-  return getEducationFinalPositions()[0] || getSportsFinalPositions()[0] || competitionResults[0] || {};
-}
-
-function renderAvSlide() {
-  const slide = avSlides[avSlideIndex % avSlides.length];
-  const liveItem = getLiveScheduleItem();
-  const nextItem = getNextScheduleItem();
-  const topHalqajat = halqaRankings.slice(0, 3);
-  const latestWinner = getLatestWinner();
-  const latestAnnouncements = announcements.slice(0, 2);
-  const attendanceStats = getAttendanceStats();
-
-  if (slide === "Welcome") {
-    return `
-      <div class="av-slide av-slide-welcome">
-        <div class="av-centerpiece">
-          <span class="av-kicker">Majlis Khuddamul Ahmadiyya Canada</span>
-          <h2>IJTEMA 2025</h2>
-          <p>Muqami</p>
-        </div>
-      </div>
-    `;
-  }
-
-  if (slide === "Live Schedule") {
-    return `
-      <div class="av-slide av-slide-schedule">
-        <div class="av-centerpiece">
-          <span class="av-kicker">Live Now</span>
-          <h2>${liveItem.title || "Program Live"}</h2>
-          <div class="av-divider"></div>
-          <p>${liveItem.location || "Main Hall"}</p>
-          <h3>${liveItem.start || "--"} - ${liveItem.end || "--"}</h3>
-        </div>
-      </div>
-    `;
-  }
-
-  if (slide === "Coming Up") {
-    return `
-      <div class="av-slide av-slide-coming">
-        <div class="av-centerpiece">
-          <span class="av-kicker">Coming Up</span>
-          <h2>${nextItem.title || "Next Program"}</h2>
-          <div class="av-feature">
-            <strong>${nextItem.location || "Venue"}</strong>
-            <span>${nextItem.start || "--"} - ${nextItem.end || "--"}</span>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  if (slide === "Attendance Live") {
-    return `
-      <div class="av-slide av-slide-attendance">
-        <div class="av-centerpiece">
-          <span class="av-kicker">Attendance Live</span>
-          <div class="av-stat-grid">
-            <div><strong>${attendanceStats.registered}</strong><span>Registered</span></div>
-            <div><strong>${attendanceStats.present}</strong><span>Checked In</span></div>
-            <div><strong>${attendanceStats.rate}%</strong><span>Attendance Rate</span></div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  if (slide === "Announcements") {
-    return `
-      <div class="av-slide av-slide-announcement">
-        <div class="av-centerpiece">
-          <span class="av-kicker">Important Announcement</span>
-          <h2>${latestAnnouncements[0]?.title || "Notice"}</h2>
-          <p>${latestAnnouncements[0]?.message || "Please follow event staff directions."}</p>
-          ${
-            latestAnnouncements[1]
-              ? `<div class="av-feature"><strong>${latestAnnouncements[1].title}</strong><span>${latestAnnouncements[1].message}</span></div>`
-              : ""
-          }
-        </div>
-      </div>
-    `;
-  }
-
-  if (slide === "Leaderboard") {
-    return `
-      <div class="av-slide av-slide-leaderboard">
-        <div class="av-centerpiece">
-          <span class="av-kicker">Current Standings</span>
-          <div class="av-list">
-            ${topHalqajat
-              .map(
-                (item, index) => `
-                  <div class="av-list-row">
-                    <strong>${index === 0 ? "1st" : index === 1 ? "2nd" : "3rd"}</strong>
-                    <span>${item.halqa}</span>
-                    <em>${item.total} pts</em>
-                  </div>
-                `
-              )
-              .join("")}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="av-slide av-slide-winners">
-      <div class="av-centerpiece">
-        <span class="av-kicker">Winner</span>
-        <h2>${latestWinner.competition || latestWinner.sport || "Competition"}</h2>
-        <div class="av-winner-card">
-          <span>${latestWinner.position || "First Place"}</span>
-          <strong>${latestWinner.participantName || latestWinner.name || latestWinner.halqa || "Winner"}</strong>
-          <em>${latestWinner.halqa || ""}</em>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderAvDisplay() {
-  return `
-    <section class="av-display">
-      ${renderAvDisplayContents()}
-    </section>
-  `;
-}
-
-function renderAvDisplayContents() {
-  return `
-    <button class="av-maximize" type="button" aria-label="Maximize AV display">Maximize</button>
-    ${renderAvSlide()}
-  `;
-}
-
-function refreshAvDisplayOnly() {
-  const display = document.querySelector(".av-display");
-
-  if (!display) {
-    renderDashboard("av");
-    return;
-  }
-
-  display.innerHTML = renderAvDisplayContents();
-  bindAvDisplayControls();
-}
-
 function getRegistrationRows() {
   const query = registrationSearch.trim().toLowerCase();
 
   return memberRecords.filter((member) => {
     const matchesHalqa = registrationHalqaFilter === "All" || member.halqa === registrationHalqaFilter;
+    const present = isMemberPresent(member);
+    const statusLabel = present ? "Present" : "Pending";
+    const matchesStatus = registrationStatusFilter === "All" || registrationStatusFilter === statusLabel;
     const matchesQuery =
       !query ||
       String(member.code || "").toLowerCase().includes(query) ||
       String(member.name || "").toLowerCase().includes(query) ||
       String(member.halqa || "").toLowerCase().includes(query);
 
-    return matchesHalqa && matchesQuery;
+    return matchesHalqa && matchesStatus && matchesQuery;
   });
 }
 
@@ -3288,14 +3388,17 @@ function getPercent(numerator, denominator) {
 }
 
 function getRegistrationStats() {
-  const registeredMembers = memberRecords.filter((member) => member.registered);
+  const registeredMembers = registrationRecords.length ? registrationRecords : memberRecords.filter((member) => member.registered);
   const attendedMembers = memberRecords.filter((member) => isMemberPresent(member));
-  const totalTajnid = getTotalTajnid();
+  const totalTajnid = getTotalTajnid() || masterMemberRecords.length || memberRecords.filter((member) => member.source !== "registration-only").length;
   const halqaCounts = halqajat
     .map((halqa) => {
-      const tajnid = getHalqaTajnid(halqa);
+      const halqaMembers = masterMemberRecords.length
+        ? masterMemberRecords.filter((member) => member.halqa === halqa)
+        : memberRecords.filter((member) => member.halqa === halqa && member.source !== "registration-only");
+      const tajnid = getHalqaTajnid(halqa) || halqaMembers.length;
       const count = registeredMembers.filter((member) => member.halqa === halqa).length;
-      const attended = attendedMembers.filter((member) => member.halqa === halqa).length;
+      const attended = attendedMembers.filter((member) => member.halqa === halqa && member.registered).length;
 
       return {
         halqa,
@@ -3307,15 +3410,17 @@ function getRegistrationStats() {
       };
     })
     .sort((a, b) => b.count - a.count);
-  const attendanceRate = registeredMembers.length ? Math.round((attendedMembers.length / registeredMembers.length) * 100) : 0;
+  const registeredCodes = new Set(registeredMembers.map((member) => normalizeAttendanceCode(member.code)).filter(Boolean));
+  const registeredAttendedCount = attendedMembers.filter((member) => registeredCodes.has(normalizeAttendanceCode(member.code))).length;
+  const attendanceRate = registeredMembers.length ? Math.round((registeredAttendedCount / registeredMembers.length) * 100) : 0;
 
   return {
     total: registeredMembers.length,
     totalTajnid,
     unregistered: Math.max(totalTajnid - registeredMembers.length, 0),
     registrationCoverage: getPercent(registeredMembers.length, totalTajnid),
-    attended: attendedMembers.length,
-    pending: Math.max(registeredMembers.length - attendedMembers.length, 0),
+    attended: registeredAttendedCount,
+    pending: Math.max(registeredMembers.length - registeredAttendedCount, 0),
     attendanceRate,
     halqaCounts,
   };
@@ -3391,14 +3496,6 @@ function renderAdminRegistrations() {
         <div class="attendance-progress-track" aria-label="Registration attendance progress">
           <span style="width: ${Math.min(Math.max(stats.registrationCoverage, 0), 100)}%"></span>
         </div>
-      </div>
-
-      <div class="attendance-action-row">
-        <button class="secondary-button compact registration-excel-button" type="button">Excel Report</button>
-        <button class="secondary-button compact registration-pdf-button" type="button">PDF Report</button>
-        <button class="secondary-button compact registration-summary-button" type="button">Halqa Summary</button>
-        <button class="secondary-button compact registration-print-button" type="button">Print List</button>
-        <button class="primary-button compact registration-refresh-button" type="button">Refresh</button>
       </div>
 
       <div class="registration-ops-grid">
@@ -3477,47 +3574,64 @@ function renderAdminRegistrations() {
             </select>
           </label>
           <label class="search-field">
-            <span>Attendance</span>
-            <select>
-              <option selected>All</option>
-              <option>Checked In</option>
-              <option>Pending</option>
+            <span>Attendance Status</span>
+            <select id="registrationStatusFilter">
+              ${["All", "Present", "Pending"]
+                .map((s) => `<option ${registrationStatusFilter === s ? "selected" : ""}>${s}</option>`)
+                .join("")}
             </select>
           </label>
         </div>
+        <div class="registration-toolbar-actions">
+          <button class="secondary-button compact registration-pdf-button" type="button">PDF Report</button>
+          <button class="secondary-button compact registration-excel-button" type="button">Excel</button>
+        </div>
       </section>
 
-      <div class="detail-table registration-ops-table" role="table" aria-label="Registration list">
-        <div class="detail-row registration-row detail-head" role="row">
-          <span>Code</span>
-          <span>Name</span>
-          <span>Halqa</span>
-          <span>Registered</span>
-          <span>Tajnid</span>
-          <span>Check-In</span>
-          <span>Status</span>
-          <span>Actions</span>
-        </div>
-        ${rows
-          .map(
-            (member) => `
-              <div class="detail-row registration-row" role="row">
-                <strong>${member.code || "-"}</strong>
-                <span>${member.name || "-"}</span>
-                <span>${member.halqa || "-"}</span>
-                <span class="pill ${member.registered ? "pill-success" : "pill-muted"}">${member.registered ? "Yes" : "No"}</span>
-                <span>${getHalqaTajnid(member.halqa)}</span>
-                <span>${getMemberCheckIn(member) || "-"}</span>
-                <span class="pill ${isMemberPresent(member) ? "pill-success" : "pill-muted"}">${isMemberPresent(member) ? "Present" : "Pending"}</span>
-                <span class="attendance-row-actions">
-                  <button class="secondary-button compact" type="button">View</button>
-                  <button class="secondary-button compact" type="button">Edit</button>
-                </span>
-              </div>
-            `
-          )
-          .join("")}
-      </div>
+      ${(() => {
+        const totalPages = Math.max(1, Math.ceil(rows.length / registrationPerPage));
+        const safePage = Math.min(registrationPage, totalPages);
+        const pageRows = rows.slice((safePage - 1) * registrationPerPage, safePage * registrationPerPage);
+        return `
+          <div class="registration-pagination-bar">
+            <div class="pagination-per-page">
+              <span>Show</span>
+              ${[25, 50, 100, 200].map((n) => `<button class="pagination-size-btn ${registrationPerPage === n ? "is-active" : ""}" data-size="${n}" type="button">${n}</button>`).join("")}
+              <span>per page</span>
+            </div>
+            <div class="pagination-nav">
+              <span>${rows.length} total</span>
+              <button class="secondary-button compact pagination-prev" type="button" ${safePage <= 1 ? "disabled" : ""}>&#8249; Prev</button>
+              <span class="pagination-label">Page ${safePage} of ${totalPages}</span>
+              <button class="secondary-button compact pagination-next" type="button" ${safePage >= totalPages ? "disabled" : ""}>Next &#8250;</button>
+            </div>
+          </div>
+          <div class="detail-table registration-ops-table" role="table" aria-label="Registration list">
+            <div class="detail-row registration-row detail-head" role="row">
+              <span>Code</span>
+              <span>Name</span>
+              <span>Halqa</span>
+              <span>Registered</span>
+              <span>Check-In</span>
+              <span>Status</span>
+            </div>
+            ${pageRows
+              .map(
+                (member) => `
+                  <div class="detail-row registration-row" role="row">
+                    <strong>${member.code || "-"}</strong>
+                    <span>${member.name || "-"}</span>
+                    <span>${member.halqa || "-"}</span>
+                    <span class="pill ${member.registered ? "pill-success" : "pill-muted"}">${member.registered ? "Yes" : "No"}</span>
+                    <span>${getMemberCheckIn(member) || "-"}</span>
+                    <span class="pill ${isMemberPresent(member) ? "pill-success" : "pill-muted"}">${isMemberPresent(member) ? "Present" : "Pending"}</span>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        `;
+      })()}
     </section>
   `;
 }
@@ -3540,8 +3654,9 @@ function getAttendanceReportRows() {
 }
 
 function getAttendanceReportStats() {
-  const registeredMembers = memberRecords.filter((member) => member.registered);
-  const presentMembers = registeredMembers.filter((member) => isMemberPresent(member));
+  const registeredMembers = registrationRecords.length ? registrationRecords : memberRecords.filter((member) => member.registered);
+  const registeredCodes = new Set(registeredMembers.map((member) => normalizeAttendanceCode(member.code)).filter(Boolean));
+  const presentMembers = memberRecords.filter((member) => isMemberPresent(member) && registeredCodes.has(normalizeAttendanceCode(member.code)));
   const rate = registeredMembers.length ? Math.round((presentMembers.length / registeredMembers.length) * 100) : 0;
   const totalTajnid = getTotalTajnid();
   const halqaCounts = halqajat
@@ -3654,7 +3769,6 @@ function getRegistrationExportRows() {
     member.name || "-",
     member.halqa || "-",
     member.registered ? "Yes" : "No",
-    getHalqaTajnid(member.halqa),
     getMemberCheckIn(member) || "-",
     isMemberPresent(member) ? "Present" : "Pending",
   ]);
@@ -3682,23 +3796,30 @@ function exportRegistrationCsv(summaryOnly = false) {
 
   downloadCsv(
     "registration-report.csv",
-    ["Code", "Name", "Halqa", "Registered", "Tajnid", "Check-In", "Status"],
+    ["Code", "Name", "Halqa", "Registered", "Check-In", "Status"],
     getRegistrationExportRows()
   );
 }
 
 function openRegistrationPdfReport() {
-  const stats = getRegistrationStats();
+  const filteredRows = getRegistrationRows();
+  const presentCount = filteredRows.filter((m) => isMemberPresent(m)).length;
+  const pendingCount = filteredRows.length - presentCount;
+  const filterDesc = [
+    registrationHalqaFilter !== "All" ? `Halqa: ${registrationHalqaFilter}` : "",
+    registrationStatusFilter !== "All" ? `Status: ${registrationStatusFilter}` : "",
+    registrationSearch ? `Search: "${registrationSearch}"` : "",
+  ].filter(Boolean).join(" | ") || "All Members";
 
   openReportWindow(
-    "IJTEMA Registration Report",
+    `IJTEMA Registration Report — ${filterDesc}`,
     [
-      ["Registered", stats.total],
-      ["Total Tajnid", stats.totalTajnid],
-      ["Not Registered", stats.unregistered],
-      ["Registration Rate", `${stats.registrationCoverage}%`],
+      ["Total Shown", String(filteredRows.length)],
+      ["Present", String(presentCount)],
+      ["Pending", String(pendingCount)],
+      ["Attendance Rate", filteredRows.length ? `${Math.round((presentCount / filteredRows.length) * 100)}%` : "0%"],
     ],
-    ["Code", "Name", "Halqa", "Registered", "Tajnid", "Check-In", "Status"],
+    ["Code", "Name", "Halqa", "Registered", "Check-In", "Status"],
     getRegistrationExportRows()
   );
 }
@@ -3713,55 +3834,39 @@ function getAttendanceExportRows() {
       member.code || "-",
       member.name || "-",
       member.halqa || "-",
-      getHalqaTajnid(member.halqa),
       isMemberPresent(member) ? "Present" : "Pending",
       checkInTime,
       checkedInBy,
-      isMemberPresent(member) ? checkInTime : "-",
     ];
   });
 }
 
-function exportAttendanceCsv(summaryOnly = false) {
-  const stats = getAttendanceReportStats();
-
-  if (summaryOnly) {
-    downloadCsv(
-      "attendance-summary.csv",
-      ["Halqa", "Tajnid", "Registered", "Registration %", "Present", "Pending", "Attendance Rate", "Tajnid Attendance %"],
-      stats.halqaCounts.map((item) => [
-        item.halqa,
-        item.tajnid,
-        item.registered,
-        `${item.registrationCoverage}%`,
-        item.present,
-        Math.max(item.registered - item.present, 0),
-        `${item.rate}%`,
-        `${item.tajnidAttendanceRate}%`,
-      ])
-    );
-    return;
-  }
-
+function exportAttendanceCsv() {
   downloadCsv(
     "attendance-report.csv",
-    ["Code", "Name", "Halqa", "Tajnid", "Status", "Check-In Time", "Checked In By", "Last Updated"],
+    ["Code", "Name", "Halqa", "Status", "Check-In Time", "Checked In By"],
     getAttendanceExportRows()
   );
 }
 
 function openAttendancePdfReport() {
-  const stats = getAttendanceReportStats();
+  const filteredRows = getAttendanceReportRows();
+  const presentCount = filteredRows.filter((m) => isMemberPresent(m)).length;
+  const filterDesc = [
+    attendanceReportHalqaFilter !== "All" ? `Halqa: ${attendanceReportHalqaFilter}` : "",
+    attendanceReportStatusFilter !== "All" ? `Status: ${attendanceReportStatusFilter}` : "",
+    attendanceReportSearch ? `Search: "${attendanceReportSearch}"` : "",
+  ].filter(Boolean).join(" | ") || "All Members";
 
   openReportWindow(
-    "IJTEMA Attendance Report",
+    `IJTEMA Attendance Report — ${filterDesc}`,
     [
-      ["Present", stats.present],
-      ["Pending", stats.pending],
-      ["Attendance Rate", `${stats.rate}%`],
-      ["Tajnid Reach", `${stats.tajnidAttendanceRate}%`],
+      ["Total Shown", String(filteredRows.length)],
+      ["Present", String(presentCount)],
+      ["Pending", String(filteredRows.length - presentCount)],
+      ["Attendance Rate", filteredRows.length ? `${Math.round((presentCount / filteredRows.length) * 100)}%` : "0%"],
     ],
-    ["Code", "Name", "Halqa", "Tajnid", "Status", "Check-In Time", "Checked In By", "Last Updated"],
+    ["Code", "Name", "Halqa", "Status", "Check-In Time", "Checked In By"],
     getAttendanceExportRows()
   );
 }
@@ -3886,14 +3991,6 @@ function renderAdminAttendanceReports() {
         </div>
       </div>
 
-      <div class="attendance-action-row">
-        <button class="secondary-button compact attendance-excel-button" type="button">Excel Report</button>
-        <button class="secondary-button compact attendance-pdf-button" type="button">PDF Report</button>
-        <button class="secondary-button compact attendance-summary-button" type="button">Attendance Summary</button>
-        <button class="secondary-button compact attendance-print-button" type="button">Print Sheet</button>
-        <button class="primary-button compact attendance-refresh-button" type="button">Refresh</button>
-      </div>
-
       <div class="attendance-ops-grid">
         <section class="attention-panel">
           <div class="section-title-row">
@@ -3971,19 +4068,6 @@ function renderAdminAttendanceReports() {
         </div>
       </section>
 
-      <section class="attendance-bulk-panel">
-        <div>
-          <strong>Selected: ${rows.length} members</strong>
-          <span>The current filters define this selection for export, print, and bulk attendance updates.</span>
-        </div>
-        <div class="attendance-action-row">
-          <button class="secondary-button compact attendance-export-selection-button" type="button">Export Selection</button>
-          <button class="secondary-button compact attendance-print-selection-button" type="button">Print Selection</button>
-          <button class="secondary-button compact attendance-mark-present-button" type="button">Mark Present</button>
-          <button class="secondary-button compact attendance-mark-absent-button" type="button">Mark Absent</button>
-        </div>
-      </section>
-
       <section class="attendance-toolbar-panel">
         <div class="section-title-row">
           <div>
@@ -4013,52 +4097,62 @@ function renderAdminAttendanceReports() {
                 .join("")}
             </select>
           </label>
-          <label class="search-field">
-            <span>Time Range</span>
-            <select>
-              <option selected>Today</option>
-              <option>This Session</option>
-              <option>All Records</option>
-            </select>
-          </label>
+        </div>
+        <div class="registration-toolbar-actions">
+          <button class="secondary-button compact attendance-pdf-button" type="button">PDF Report</button>
+          <button class="secondary-button compact attendance-excel-button" type="button">Excel</button>
         </div>
       </section>
 
-      <div class="detail-table attendance-ops-table" role="table" aria-label="Attendance report">
-        <div class="detail-row attendance-report-row detail-head" role="row">
-          <span>Code</span>
-          <span>Name</span>
-          <span>Halqa</span>
-          <span>Tajnid</span>
-          <span>Status</span>
-          <span>Check-In Time</span>
-          <span>Checked In By</span>
-          <span>Last Updated</span>
-        </div>
-        ${rows
-          .map((member) => {
-            const attendanceRecord = getAttendanceRecordForMember(member.code) || {};
-            const present = isMemberPresent(member);
-            const checkInTime = getMemberCheckIn(member) || attendanceRecord.checkIn || "-";
-            const statusLabel = present ? "Present" : "Pending";
-            const checkedInBy = attendanceRecord.checkedInBy || (present ? "Check-in desk" : "-");
-            const lastUpdatedValue = present ? checkInTime : "-";
-
-            return `
-              <div class="detail-row attendance-report-row" role="row">
-                <strong>${member.code || "-"}</strong>
-                <span>${member.name || "-"}</span>
-                <span>${member.halqa || "-"}</span>
-                <span>${getHalqaTajnid(member.halqa)}</span>
-                <span class="pill ${present ? "pill-success" : "pill-muted"}">${statusLabel}</span>
-                <span>${checkInTime}</span>
-                <span>${checkedInBy}</span>
-                <span>${lastUpdatedValue}</span>
-              </div>
-            `;
-          })
-          .join("")}
-      </div>
+      ${(() => {
+        const totalPages = Math.max(1, Math.ceil(rows.length / attendanceReportPerPage));
+        const safePage = Math.min(attendanceReportPage, totalPages);
+        const pageRows = rows.slice((safePage - 1) * attendanceReportPerPage, safePage * attendanceReportPerPage);
+        return `
+          <div class="registration-pagination-bar">
+            <div class="pagination-per-page">
+              <span>Show</span>
+              ${[25, 50, 100, 200].map((n) => `<button class="attendance-size-btn pagination-size-btn ${attendanceReportPerPage === n ? "is-active" : ""}" data-size="${n}" type="button">${n}</button>`).join("")}
+              <span>per page</span>
+            </div>
+            <div class="pagination-nav">
+              <span>${rows.length} total</span>
+              <button class="secondary-button compact attendance-page-prev" type="button" ${safePage <= 1 ? "disabled" : ""}>&#8249; Prev</button>
+              <span class="pagination-label">Page ${safePage} of ${totalPages}</span>
+              <button class="secondary-button compact attendance-page-next" type="button" ${safePage >= totalPages ? "disabled" : ""}>Next &#8250;</button>
+            </div>
+          </div>
+          <div class="detail-table attendance-ops-table" role="table" aria-label="Attendance report">
+            <div class="detail-row attendance-report-row detail-head" role="row">
+              <span>Code</span>
+              <span>Name</span>
+              <span>Halqa</span>
+              <span>Status</span>
+              <span>Check-In Time</span>
+              <span>Checked In By</span>
+            </div>
+            ${pageRows
+              .map((member) => {
+                const attendanceRecord = getAttendanceRecordForMember(member.code) || {};
+                const present = isMemberPresent(member);
+                const checkInTime = getMemberCheckIn(member) || attendanceRecord.checkIn || "-";
+                const statusLabel = present ? "Present" : "Pending";
+                const checkedInBy = attendanceRecord.checkedInBy || (present ? "Check-in desk" : "-");
+                return `
+                  <div class="detail-row attendance-report-row" role="row">
+                    <strong>${member.code || "-"}</strong>
+                    <span>${member.name || "-"}</span>
+                    <span>${member.halqa || "-"}</span>
+                    <span class="pill ${present ? "pill-success" : "pill-muted"}">${statusLabel}</span>
+                    <span>${checkInTime}</span>
+                    <span>${checkedInBy}</span>
+                  </div>
+                `;
+              })
+              .join("")}
+          </div>
+        `;
+      })()}
     </section>
   `;
 }
@@ -4240,89 +4334,252 @@ function renderSportsRosterManager() {
 }
 
 function renderAdminCompetitions() {
-  const rows = getAdminCompetitionRows();
-  const educationRows = rows.filter((result) => result.category === "Education");
-  const sportsRows = rows.filter((result) => result.category === "Sports");
-  const educationFinals = getEducationFinalPositions().slice(0, 10);
-  const sportsFinals = getSportsFinalPositions().slice(0, 10);
+  return `
+    <div class="finals-export-bar">
+      <div class="finals-export-filters">
+        <select id="finalsExportCompFilter">
+          <option value="">All Competitions</option>
+          ${competitionsList.map((c) => `<option value="${escapeAttribute(c.id)}">${escapeHtml(c.name)} (${c.category})</option>`).join("")}
+        </select>
+        <select id="finalsExportHalqaFilter">
+          <option value="">All Halqajat</option>
+          ${halqajat.map((h) => `<option>${escapeHtml(h)}</option>`).join("")}
+        </select>
+        <button class="secondary-button compact" id="exportFinalsPdf" type="button">PDF Report</button>
+        <button class="secondary-button compact" id="exportFinalsExcel" type="button">Excel Export</button>
+      </div>
+    </div>
+    ${renderFinalPositionsManager(null)}
+  `;
+}
+
+function renderMemberRow(member, mi) {
+  const halqaOpts = halqajat
+    .map((h) => `<option${member?.halqa === h ? " selected" : ""}>${escapeHtml(h)}</option>`)
+    .join("");
+  return `
+    <div class="member-row" data-member-idx="${mi}">
+      <div class="member-code-wrap">
+        <input class="member-code-input" value="${escapeAttribute(member?.code || "")}" placeholder="Code / search name" autocomplete="off" />
+        <div class="member-ac-dropdown" style="display:none"></div>
+      </div>
+      <input class="member-name-input" value="${escapeAttribute(member?.name || "")}" placeholder="Full name" />
+      <select class="member-halqa-select">
+        <option value="">— halqa —</option>
+        ${halqaOpts}
+      </select>
+      <button class="finals-icon-btn remove-member-row-btn" title="Remove member" type="button">✕</button>
+    </div>
+  `;
+}
+
+function renderPositionSlot(entry, idx) {
+  const ranks = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th"];
+  const rankOpts = ranks.map((r) => `<option${entry?.rank === r ? " selected" : ""}>${r}</option>`).join("");
+  const members = entry?.members?.length ? entry.members : [{ code: "", name: "", halqa: "" }];
+  return `
+    <div class="position-slot" data-entry-id="${escapeAttribute(entry?.id || "")}" data-slot-idx="${idx}">
+      <div class="position-slot-header">
+        <label class="slot-rank-label">
+          <span>Position</span>
+          <select class="rank-select">${rankOpts}</select>
+        </label>
+        <button class="danger-button compact remove-slot-btn" type="button">Remove</button>
+      </div>
+      <div class="member-list">
+        ${members.map((m, mi) => renderMemberRow(m, mi)).join("")}
+      </div>
+      <button class="secondary-button compact add-member-row-btn" type="button">+ Add Member</button>
+    </div>
+  `;
+}
+
+function renderFinalPositionsManager(categoryFilter) {
+  const visibleComps = categoryFilter
+    ? competitionsList.filter((c) => c.category === categoryFilter)
+    : competitionsList;
+
+  const activeComp = selectedCompetitionId
+    ? competitionsList.find((c) => c.id === selectedCompetitionId && (!categoryFilter || c.category === categoryFilter))
+    : null;
+
+  const currentEntries = activeComp ? competitionFinals.filter((f) => f.competitionId === activeComp.id) : [];
+  const rankOrder = { "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5, "6th": 6, "7th": 7, "8th": 8, "9th": 9, "10th": 10 };
+  const sortedEntries = [...currentEntries].sort((a, b) => (rankOrder[a.rank] || 99) - (rankOrder[b.rank] || 99));
 
   return `
-    <div class="registration-summary">
-      <div class="metric">
-        <strong>${competitionResults.length}</strong>
-        <span>Published results</span>
-      </div>
-      <div class="metric">
-        <strong>${educationJudgeResults.length}</strong>
-        <span>Education judge posts</span>
-      </div>
-      <div class="metric">
-        <strong>${sportsPostedResults.length}</strong>
-        <span>Sports posts</span>
-      </div>
-      <div class="metric">
-        <strong>${educationRows.length}/${sportsRows.length}</strong>
-        <span>Edu / Sports visible</span>
-      </div>
-    </div>
+    <section class="finals-manager-shell" id="finalsManagerShell">
+      <div class="finals-layout">
+        <aside class="finals-sidebar">
+          <div class="finals-sidebar-top">
+            <strong>${categoryFilter ? categoryFilter + " " : ""}Competitions</strong>
+            <button class="secondary-button compact show-new-comp-form-btn" type="button">+ New</button>
+          </div>
 
-    <div class="filter-bar">
-      <label class="search-field">
-        <span>Search published results</span>
-        <input id="competitionAdminSearchInput" value="${competitionAdminSearch}" placeholder="Competition, name, or halqa" />
-      </label>
-      <label class="search-field">
-        <span>Category</span>
-        <select id="competitionAdminCategoryFilter">
-          ${["All", "Education", "Sports"]
-            .map((category) => `<option ${competitionAdminCategoryFilter === category ? "selected" : ""}>${category}</option>`)
-            .join("")}
-        </select>
-      </label>
-    </div>
+          <form class="finals-new-comp-form" id="newCompForm" style="display:none">
+            <label class="field">
+              <span>Name</span>
+              <input name="name" placeholder="e.g. Nazm, Relay Race" required />
+            </label>
+            <div class="form-grid">
+              <label class="field">
+                <span>Category</span>
+                <select name="category">
+                  ${categoryFilter
+                    ? `<option>${categoryFilter}</option>`
+                    : `<option>Education</option><option>Sports</option>`}
+                </select>
+              </label>
+              <label class="field">
+                <span>Type</span>
+                <select name="type">
+                  <option>Individual</option>
+                  <option>Team</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="primary-button compact" type="submit">Add Competition</button>
+              <button class="secondary-button compact cancel-new-comp-btn" type="button">Cancel</button>
+            </div>
+          </form>
 
-    <section class="admin-subsection">
-      <h3>Published Competition Results</h3>
-      <div class="detail-table" role="table" aria-label="Published competition results">
-        <div class="detail-row competition-admin-row detail-head" role="row">
-          <span>Category</span>
-          <span>Competition</span>
-          <span>Position</span>
-          <span>Name</span>
-          <span>Halqa</span>
-          <span>Points</span>
+          <div class="finals-comp-list">
+            ${
+              visibleComps.length === 0
+                ? `<div class="access-note">No competitions yet. Click "+ New" to add one.</div>`
+                : visibleComps
+                    .map((c) => {
+                      const count = competitionFinals.filter((f) => f.competitionId === c.id).length;
+                      const isActive = activeComp?.id === c.id;
+                      return `
+                        <div class="finals-comp-item${isActive ? " is-active" : ""}" data-comp-id="${escapeAttribute(c.id)}">
+                          <div class="finals-comp-item-info">
+                            <strong>${escapeHtml(c.name)}</strong>
+                            <div class="finals-comp-meta">
+                              <span class="pill ${c.category === "Education" ? "category-education" : "category-sports"}">${c.category}</span>
+                              <em>${c.type}</em>
+                              <small>${count} entr${count === 1 ? "y" : "ies"}</small>
+                            </div>
+                          </div>
+                          <button class="finals-icon-btn delete-comp-btn" data-comp-id="${escapeAttribute(c.id)}" title="Delete competition" type="button">✕</button>
+                        </div>
+                      `;
+                    })
+                    .join("")
+            }
+          </div>
+        </aside>
+
+        <div class="finals-entry-area">
+          ${
+            !activeComp
+              ? `<div class="finals-empty-state">
+                   ${iconSvg("trophy")}
+                   <p>Select a competition from the list to enter final positions.</p>
+                 </div>`
+              : `
+                <div class="finals-entry-header">
+                  <div>
+                    <h4>${escapeHtml(activeComp.name)}</h4>
+                    <span class="pill ${activeComp.category === "Education" ? "category-education" : "category-sports"}">${activeComp.category}</span>
+                    <em style="margin-left:6px;font-style:normal;font-size:0.85rem;color:var(--muted)">${activeComp.type}</em>
+                  </div>
+                  <p class="finals-entry-hint">Type a code or name in any Code field to search members. Same rank = tie. Up to 20 members per position.</p>
+                </div>
+
+                <div id="positionSlotsContainer">
+                  ${
+                    sortedEntries.length === 0
+                      ? `<div class="access-note" id="noPositionsNote">No positions entered yet. Click "Add Position" below.</div>`
+                      : sortedEntries.map((entry, idx) => renderPositionSlot(entry, idx)).join("")
+                  }
+                </div>
+
+                <div class="finals-slot-actions">
+                  <button class="secondary-button add-position-slot-btn" data-comp-id="${escapeAttribute(activeComp.id)}" type="button">+ Add Position</button>
+                  <button class="primary-button save-all-positions-btn" data-comp-id="${escapeAttribute(activeComp.id)}" type="button">Save All Positions</button>
+                </div>
+                ${competitionFinalMsg ? `<div class="portal-message">${escapeHtml(competitionFinalMsg)}</div>` : ""}
+              `
+          }
         </div>
-        ${rows
-          .map(
-            (result) => `
-              <div class="detail-row competition-admin-row" role="row">
-                <span class="pill ${result.category === "Education" ? "category-education" : "category-sports"}">${result.category}</span>
-                <span>${result.competition || "-"}</span>
-                <strong>${result.position || "-"}</strong>
-                <span>${result.name || "-"}</span>
-                <span>${result.halqa || "-"}</span>
-                <span class="total-score">${result.points || "-"}</span>
-              </div>
-            `
-          )
-          .join("")}
-      </div>
-    </section>
-
-    ${renderEducationRosterManager()}
-    ${renderSportsRosterManager()}
-
-    <section class="admin-subsection split">
-      <div>
-        <h3>Education Final Calculations</h3>
-        ${educationFinals.length ? renderEducationFinalPositions() : `<div class="access-note">No posted education judge scores yet.</div>`}
-      </div>
-      <div>
-        <h3>Sports Posted Results</h3>
-        ${sportsFinals.length ? renderSportsFinalPositions() : `<div class="access-note">No posted sports results yet.</div>`}
       </div>
     </section>
   `;
+}
+
+function collectPositionSlots() {
+  const slots = [];
+  document.querySelectorAll("#positionSlotsContainer .position-slot").forEach((slot) => {
+    const rank = slot.querySelector(".rank-select")?.value || "1st";
+    const members = [];
+    slot.querySelectorAll(".member-row").forEach((row) => {
+      const code = (row.querySelector(".member-code-input")?.value || "").trim();
+      const name = (row.querySelector(".member-name-input")?.value || "").trim();
+      const halqa = row.querySelector(".member-halqa-select")?.value || "";
+      if (name || code) members.push({ code, name, halqa });
+    });
+    if (members.length) slots.push({ rank, members });
+  });
+  return slots;
+}
+
+function openFinalsPdfReport() {
+  const exportCompId = document.querySelector("#finalsExportCompFilter")?.value || "";
+  const exportHalqa = document.querySelector("#finalsExportHalqaFilter")?.value || "";
+  const rankOrder = { "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5, "6th": 6, "7th": 7, "8th": 8, "9th": 9, "10th": 10 };
+
+  let entries = exportCompId ? competitionFinals.filter((f) => f.competitionId === exportCompId) : competitionFinals;
+
+  const filterParts = [];
+  if (exportCompId) {
+    const comp = competitionsList.find((c) => c.id === exportCompId);
+    if (comp) filterParts.push(comp.name);
+  }
+  if (exportHalqa) filterParts.push(`Halqa: ${exportHalqa}`);
+
+  const sortedEntries = [...entries].sort(
+    (a, b) => a.competition.localeCompare(b.competition) || (rankOrder[a.rank] || 99) - (rankOrder[b.rank] || 99)
+  );
+
+  const tableRows = sortedEntries.flatMap((entry) =>
+    entry.members
+      .filter((m) => !exportHalqa || m.halqa === exportHalqa)
+      .map((m) => [entry.competition, entry.category, entry.rank, m.name || "—", m.halqa || "—", m.code || "—"])
+  );
+
+  const compCount = new Set(entries.map((e) => e.competition)).size;
+
+  openReportWindow(
+    `Competition Final Positions${filterParts.length ? " — " + filterParts.join(" | ") : ""}`,
+    [
+      ["Competitions", String(compCount)],
+      ["Total Entries", String(tableRows.length)],
+    ],
+    ["Competition", "Category", "Position", "Name", "Halqa", "Code"],
+    tableRows
+  );
+}
+
+function downloadFinalsCsv() {
+  const exportCompId = document.querySelector("#finalsExportCompFilter")?.value || "";
+  const exportHalqa = document.querySelector("#finalsExportHalqaFilter")?.value || "";
+  const rankOrder = { "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5, "6th": 6, "7th": 7, "8th": 8, "9th": 9, "10th": 10 };
+
+  let entries = exportCompId ? competitionFinals.filter((f) => f.competitionId === exportCompId) : competitionFinals;
+
+  const sortedEntries = [...entries].sort(
+    (a, b) => a.competition.localeCompare(b.competition) || (rankOrder[a.rank] || 99) - (rankOrder[b.rank] || 99)
+  );
+
+  const csvRows = sortedEntries.flatMap((entry) =>
+    entry.members
+      .filter((m) => !exportHalqa || m.halqa === exportHalqa)
+      .map((m) => [entry.competition, entry.category, entry.rank, m.name || "", m.halqa || "", m.code || ""])
+  );
+
+  downloadCsv("competition-positions.csv", ["Competition", "Category", "Position", "Name", "Halqa", "Code"], csvRows);
 }
 
 function getAdminUserRows() {
@@ -4352,7 +4609,7 @@ function renderAdminUsers() {
   const rows = getAdminUserRows();
   const roleCounts = getRoleCounts();
   const roles = ["All", ...Array.from(new Set(dashboardUsers.map((user) => user.role).filter(Boolean)))];
-  const roleOptions = ["admin", "zaim", "attendance", "educationJudge", "sportsAdmin", "av"];
+  const roleOptions = ["admin", "zaim", "attendance", "educationJudge", "sportsAdmin"];
   const editingItem = editingUserRow
     ? dashboardUsers.find((user, index) => getRowId(user, index) === editingUserRow)
     : null;
@@ -5374,7 +5631,7 @@ function renderAdminSchedulePreview(item) {
   const status = getComputedScheduleStatus(previewItem);
 
   return `
-    <div class="schedule-public-preview" aria-label="Public preview">
+    <div class="schedule-public-preview" id="schedulePreviewBox" aria-label="Public preview">
       <span class="public-kicker">Public Preview</span>
       <strong>${previewItem.title}</strong>
       <p>${previewItem.start} - ${previewItem.end}</p>
@@ -5436,12 +5693,21 @@ function renderAdminScheduleManager() {
             <div class="form-grid">
               <label class="field">
                 <span>Starts</span>
-                <input name="start" value="${editingItem?.start || ""}" placeholder="02:00 PM" required />
+                <input type="time" name="start" value="${to24h(editingItem?.start || "")}" required />
               </label>
               <label class="field">
                 <span>Ends</span>
-                <input name="end" value="${editingItem?.end || ""}" placeholder="02:45 PM" required />
+                <input type="time" name="end" value="${to24h(editingItem?.end || "")}" required />
               </label>
+            </div>
+            <div class="duration-presets">
+              <span>Quick duration:</span>
+              <button type="button" class="duration-btn" data-dur="30">+30 min</button>
+              <button type="button" class="duration-btn" data-dur="45">+45 min</button>
+              <button type="button" class="duration-btn" data-dur="60">+1 hr</button>
+              <button type="button" class="duration-btn" data-dur="90">+1.5 hr</button>
+            </div>
+            <div class="form-grid">
               <label class="field wide">
                 <span>Program name</span>
                 <input name="title" value="${editingItem?.title || ""}" placeholder="Final Session" required />
@@ -5764,6 +6030,7 @@ function renderPanels(role) {
   if (role === "attendance") {
     const attendanceContent = {
       "Check-In Station": renderAttendanceCheckIn,
+      "Manual Entry": renderManualWalkInPage,
       "Activity Log": renderRecentAttendance,
       Issues: renderAttendanceIssues,
     };
@@ -5833,6 +6100,10 @@ function renderPanels(role) {
             return role === "admin" ? panel.title === "Admin Registrations" : panel.title.includes("Registration");
           }
 
+          if (currentSection === "Attendance Input") {
+            return panel.title === "Admin Attendance Input";
+          }
+
           if (currentSection === "Attendance Details" || currentSection === "Attendance Reports") {
             return role === "admin" ? panel.title === "Admin Attendance Reports" : panel.title.includes("Attendance");
           }
@@ -5868,9 +6139,7 @@ function renderPanels(role) {
           }
 
           if (currentSection === "Final Positions") {
-            return role === "sportsAdmin"
-              ? panel.title === "Sports Final Positions"
-              : panel.title === "Education Final Positions";
+            return panel.title === "Final Positions";
           }
 
           if (currentSection === "Sports Standings") {
@@ -5885,9 +6154,6 @@ function renderPanels(role) {
             return panel.title === "Sports Result Entry";
           }
 
-          if (role === "av" && currentSection === "Display") {
-            return panel.title === "Projector Slideshow";
-          }
 
           return panel.title.includes(currentSection);
         });
@@ -5965,35 +6231,17 @@ function renderPanels(role) {
       panel.title === "Announcement Manager" && role === "admin" ? renderAdminAnnouncementManager() : "";
     const adminRegistrationsMarkup =
       panel.title === "Admin Registrations" && role === "admin" ? renderAdminRegistrations() : "";
+    const adminAttendanceInputMarkup =
+      panel.title === "Admin Attendance Input" && role === "admin" ? renderAttendanceCheckIn() : "";
     const adminAttendanceReportsMarkup =
       panel.title === "Admin Attendance Reports" && role === "admin" ? renderAdminAttendanceReports() : "";
     const adminCompetitionsMarkup =
       panel.title === "Admin Competitions" && role === "admin" ? renderAdminCompetitions() : "";
     const adminUsersMarkup = panel.title === "Admin Users" && role === "admin" ? renderAdminUsers() : "";
-    const avDisplayMarkup = panel.title === "Projector Slideshow" && role === "av" ? renderAvDisplay() : "";
-    const judgeScoreMarkup =
-      panel.title === "Education Score Entry" && role === "educationJudge" ? renderEducationScoreEntry() : "";
-    const judgeSetupMarkup =
-      panel.title === "Education Competition Setup" && role === "educationJudge" ? renderEducationCompetitionSetup() : "";
-    const judgePostedMarkup =
-      panel.title === "Posted Education Results" && role === "educationJudge" ? renderPostedEducationResults() : "";
-    const judgeFinalMarkup =
-      panel.title === "Education Final Positions" && role === "educationJudge" ? renderEducationFinalPositions() : "";
-    const sportsEntryMarkup =
-      panel.title === "Sports Result Entry" && role === "sportsAdmin" ? renderSportsResultEntry() : "";
-    const sportsPostedMarkup =
-      panel.title === "Published Sports Results" && role === "sportsAdmin" ? renderPostedSportsResults() : "";
+    const eduFinalMarkup =
+      panel.title === "Final Positions" && role === "educationJudge" ? renderFinalPositionsManager("Education") : "";
     const sportsFinalMarkup =
-      panel.title === "Sports Standings" && role === "sportsAdmin" ? renderSportsFinalPositions() : "";
-    const sportsCeremonyMarkup =
-      panel.title === "Closing Ceremony Sheet" && role === "sportsAdmin" ? renderSportsCeremonySheet() : "";
-
-    if (avDisplayMarkup) {
-      article.className = "panel full av-stage-panel";
-      article.innerHTML = avDisplayMarkup;
-      dashboardGrid.append(article);
-      return;
-    }
+      panel.title === "Final Positions" && role === "sportsAdmin" ? renderFinalPositionsManager("Sports") : "";
 
     article.innerHTML = `
       <h2>${panel.title}</h2>
@@ -6012,18 +6260,12 @@ function renderPanels(role) {
       ${adminScheduleMarkup}
       ${adminAnnouncementMarkup}
       ${adminRegistrationsMarkup}
+      ${adminAttendanceInputMarkup}
       ${adminAttendanceReportsMarkup}
       ${adminCompetitionsMarkup}
       ${adminUsersMarkup}
-      ${avDisplayMarkup}
-      ${judgeSetupMarkup}
-      ${judgeScoreMarkup}
-      ${judgePostedMarkup}
-      ${judgeFinalMarkup}
-      ${sportsEntryMarkup}
-      ${sportsPostedMarkup}
+      ${eduFinalMarkup}
       ${sportsFinalMarkup}
-      ${sportsCeremonyMarkup}
       ${halqaNote}
     `;
 
@@ -6133,7 +6375,7 @@ function bindDynamicControls() {
 
   document.querySelectorAll(".attendance-open-member").forEach((button) => {
     button.addEventListener("click", () => {
-      const member = memberRecords.find((record) => String(record.code) === String(button.dataset.code));
+      const member = memberRecords.find((record) => normalizeAttendanceCode(record.code) === normalizeAttendanceCode(button.dataset.code));
       if (!member) {
         return;
       }
@@ -6144,6 +6386,33 @@ function bindDynamicControls() {
 
   document.querySelector(".attendance-confirm-button")?.addEventListener("click", async () => {
     await confirmAttendanceModalCheckIn();
+  });
+
+  document.querySelectorAll(".manual-walkin-form").forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const formData = new FormData(event.currentTarget);
+      const manualMember = {
+        code: formData.get("code"),
+        name: String(formData.get("name") || "").trim(),
+        halqa: String(formData.get("halqa") || "").trim(),
+        phone: String(formData.get("phone") || "").trim(),
+      };
+
+      if (!manualMember.name || !manualMember.halqa) {
+        return;
+      }
+
+      await checkInMember(manualMember.code, manualMember);
+      const checkedInMember =
+        memberRecords.find((member) => normalizeAttendanceCode(member.code) === normalizeAttendanceCode(manualMember.code)) ||
+        memberRecords.find((member) => member.name === manualMember.name && member.halqa === manualMember.halqa);
+      attendanceModal = checkedInMember
+        ? { type: "success", code: checkedInMember.code, checkIn: checkedInMember.checkIn || getCurrentCheckInTime() }
+        : null;
+      attendanceSearch = "";
+      renderDashboard(currentRole);
+    });
   });
 
   document.querySelectorAll(".attendance-modal-close, .attendance-focus-search").forEach((button) => {
@@ -6167,6 +6436,7 @@ function bindDynamicControls() {
   if (registrationSearchInput) {
     registrationSearchInput.addEventListener("input", (event) => {
       registrationSearch = event.target.value;
+      registrationPage = 1;
       renderDashboard(currentRole);
       const refreshedInput = document.querySelector("#registrationSearchInput");
       refreshedInput?.focus();
@@ -6179,6 +6449,7 @@ function bindDynamicControls() {
   if (registrationHalqaSelect) {
     registrationHalqaSelect.addEventListener("change", (event) => {
       registrationHalqaFilter = event.target.value;
+      registrationPage = 1;
       renderDashboard(currentRole);
     });
   }
@@ -6186,36 +6457,43 @@ function bindDynamicControls() {
   document.querySelectorAll(".registration-halqa-count").forEach((button) => {
     button.addEventListener("click", () => {
       registrationHalqaFilter = button.dataset.halqa;
+      registrationPage = 1;
       renderDashboard(currentRole);
     });
   });
 
-  const registrationRefreshButton = document.querySelector(".registration-refresh-button");
-
-  if (registrationRefreshButton) {
-    registrationRefreshButton.addEventListener("click", () => {
+  document.querySelectorAll(".pagination-size-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      registrationPerPage = parseInt(button.dataset.size, 10);
+      registrationPage = 1;
       renderDashboard(currentRole);
     });
-  }
-
-  const registrationPrintButton = document.querySelector(".registration-print-button");
-
-  if (registrationPrintButton) {
-    registrationPrintButton.addEventListener("click", () => {
-      openRegistrationPdfReport();
-    });
-  }
-
-  document.querySelector(".registration-excel-button")?.addEventListener("click", () => {
-    exportRegistrationCsv();
   });
 
-  document.querySelector(".registration-summary-button")?.addEventListener("click", () => {
-    exportRegistrationCsv(true);
+  document.querySelector(".pagination-prev")?.addEventListener("click", () => {
+    if (registrationPage > 1) {
+      registrationPage--;
+      renderDashboard(currentRole);
+    }
+  });
+
+  document.querySelector(".pagination-next")?.addEventListener("click", () => {
+    registrationPage++;
+    renderDashboard(currentRole);
+  });
+
+  document.querySelector("#registrationStatusFilter")?.addEventListener("change", (event) => {
+    registrationStatusFilter = event.target.value;
+    registrationPage = 1;
+    renderDashboard(currentRole);
   });
 
   document.querySelector(".registration-pdf-button")?.addEventListener("click", () => {
     openRegistrationPdfReport();
+  });
+
+  document.querySelector(".registration-excel-button")?.addEventListener("click", () => {
+    exportRegistrationCsv();
   });
 
   const attendanceReportSearchInput = document.querySelector("#attendanceReportSearchInput");
@@ -6223,6 +6501,7 @@ function bindDynamicControls() {
   if (attendanceReportSearchInput) {
     attendanceReportSearchInput.addEventListener("input", (event) => {
       attendanceReportSearch = event.target.value;
+      attendanceReportPage = 1;
       renderDashboard(currentRole);
       const refreshedInput = document.querySelector("#attendanceReportSearchInput");
       refreshedInput?.focus();
@@ -6235,6 +6514,7 @@ function bindDynamicControls() {
   if (attendanceReportHalqaSelect) {
     attendanceReportHalqaSelect.addEventListener("change", (event) => {
       attendanceReportHalqaFilter = event.target.value;
+      attendanceReportPage = 1;
       renderDashboard(currentRole);
     });
   }
@@ -6244,6 +6524,7 @@ function bindDynamicControls() {
   if (attendanceReportStatusSelect) {
     attendanceReportStatusSelect.addEventListener("change", (event) => {
       attendanceReportStatusFilter = event.target.value;
+      attendanceReportPage = 1;
       renderDashboard(currentRole);
     });
   }
@@ -6251,201 +6532,223 @@ function bindDynamicControls() {
   document.querySelectorAll(".attendance-halqa-count").forEach((button) => {
     button.addEventListener("click", () => {
       attendanceReportHalqaFilter = button.dataset.halqa;
+      attendanceReportPage = 1;
       renderDashboard(currentRole);
     });
-  });
-
-  const attendanceRefreshButton = document.querySelector(".attendance-refresh-button");
-
-  if (attendanceRefreshButton) {
-    attendanceRefreshButton.addEventListener("click", () => {
-      renderDashboard(currentRole);
-    });
-  }
-
-  const attendancePrintButton = document.querySelector(".attendance-print-button");
-
-  if (attendancePrintButton) {
-    attendancePrintButton.addEventListener("click", () => {
-      openAttendancePdfReport();
-    });
-  }
-
-  document.querySelector(".attendance-excel-button")?.addEventListener("click", () => {
-    exportAttendanceCsv();
-  });
-
-  document.querySelector(".attendance-summary-button")?.addEventListener("click", () => {
-    exportAttendanceCsv(true);
   });
 
   document.querySelector(".attendance-pdf-button")?.addEventListener("click", () => {
     openAttendancePdfReport();
   });
 
-  document.querySelector(".attendance-export-selection-button")?.addEventListener("click", () => {
+  document.querySelector(".attendance-excel-button")?.addEventListener("click", () => {
     exportAttendanceCsv();
   });
 
-  document.querySelector(".attendance-print-selection-button")?.addEventListener("click", () => {
-    openAttendancePdfReport();
-  });
-
-  document.querySelector(".attendance-mark-present-button")?.addEventListener("click", async () => {
-    await markAttendanceRowsPresent();
-  });
-
-  document.querySelector(".attendance-mark-absent-button")?.addEventListener("click", async () => {
-    await markAttendanceRowsAbsent();
-  });
-
-  const competitionAdminSearchInput = document.querySelector("#competitionAdminSearchInput");
-
-  if (competitionAdminSearchInput) {
-    competitionAdminSearchInput.addEventListener("input", (event) => {
-      competitionAdminSearch = event.target.value;
-      renderDashboard(currentRole);
-      const refreshedInput = document.querySelector("#competitionAdminSearchInput");
-      refreshedInput?.focus();
-      refreshedInput?.setSelectionRange(competitionAdminSearch.length, competitionAdminSearch.length);
-    });
-  }
-
-  const competitionAdminCategorySelect = document.querySelector("#competitionAdminCategoryFilter");
-
-  if (competitionAdminCategorySelect) {
-    competitionAdminCategorySelect.addEventListener("change", (event) => {
-      competitionAdminCategoryFilter = event.target.value;
+  document.querySelectorAll(".attendance-size-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      attendanceReportPerPage = parseInt(btn.dataset.size, 10);
+      attendanceReportPage = 1;
       renderDashboard(currentRole);
     });
-  }
+  });
 
-  document.querySelector("#educationRosterCompetition")?.addEventListener("change", (event) => {
-    educationRosterAdminCompetition = event.target.value;
+  document.querySelector(".attendance-page-prev")?.addEventListener("click", () => {
+    if (attendanceReportPage > 1) {
+      attendanceReportPage--;
+      renderDashboard(currentRole);
+    }
+  });
+
+  document.querySelector(".attendance-page-next")?.addEventListener("click", () => {
+    attendanceReportPage++;
     renderDashboard(currentRole);
   });
 
-  const renderRosterSearchResults = (input, resultsContainer, buttonClass) => {
-    const matches = getTajnidMatches(input.value);
-    resultsContainer.innerHTML = matches.length
-      ? matches
-          .map(
-            (participant) => `
-              <button class="queue-item ${buttonClass}" data-participant="${getEducationParticipantValue(participant)}" type="button">
-                <span>${participant.code || "No code"}</span>
-                <strong>${participant.name}</strong>
-                <small>${participant.halqa}</small>
-              </button>
-            `
-          )
-          .join("")
-      : input.value.trim()
-        ? `<div class="access-note">No tajnid match found. Add the name manually if needed.</div>`
-        : "";
-  };
-
-  const adminRosterSearch = document.querySelector("#adminEducationRosterSearch");
-  const adminRosterResults = document.querySelector("#adminEducationRosterResults");
-
-  if (adminRosterSearch && adminRosterResults) {
-    adminRosterSearch.addEventListener("input", () => {
-      renderRosterSearchResults(adminRosterSearch, adminRosterResults, "admin-add-education-roster-name");
+  // Finals Manager: competition list actions (direct, since full re-render follows)
+  document.querySelectorAll(".finals-comp-item").forEach((item) => {
+    item.addEventListener("click", (e) => {
+      if (e.target.closest(".delete-comp-btn")) return;
+      selectedCompetitionId = item.dataset.compId;
+      competitionFinalMsg = "";
+      renderDashboard(currentRole);
     });
-    adminRosterResults.addEventListener("click", (event) => {
-      const button = event.target.closest(".admin-add-education-roster-name");
-      if (!button) {
-        return;
+  });
+
+  document.querySelectorAll(".delete-comp-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const compId = btn.dataset.compId;
+      const comp = competitionsList.find((c) => c.id === compId);
+      if (!comp || !window.confirm(`Delete "${comp.name}" and all its positions?`)) return;
+      try {
+        const data = await apiRequest("/api/competitions/delete", {
+          method: "POST",
+          body: JSON.stringify({ id: compId }),
+        });
+        competitionsList = data.competitionsList || competitionsList;
+        competitionFinals = data.competitionFinals || competitionFinals;
+      } catch {
+        competitionsList = competitionsList.filter((c) => c.id !== compId);
+        competitionFinals = competitionFinals.filter((f) => f.competitionId !== compId);
       }
-      addEducationParticipantToRoster(educationRosterAdminCompetition, parseEducationParticipantValue(button.dataset.participant));
-      renderDashboard(currentRole);
-    });
-  }
-
-  document.querySelector("#adminEducationRosterManualForm")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    addEducationParticipantToRoster(educationRosterAdminCompetition, {
-      name: formData.get("name"),
-      code: formData.get("code"),
-      halqa: formData.get("halqa"),
-    });
-    renderDashboard(currentRole);
-  });
-
-  document.querySelectorAll(".remove-education-roster-name").forEach((button) => {
-    button.addEventListener("click", () => {
-      removeEducationParticipantFromRoster(educationRosterAdminCompetition, button.dataset.code, button.dataset.name);
+      if (selectedCompetitionId === compId) selectedCompetitionId = null;
       renderDashboard(currentRole);
     });
   });
 
-  document.querySelector("#sportsRosterSport")?.addEventListener("change", (event) => {
-    sportsRosterAdminSport = event.target.value;
-    renderDashboard(currentRole);
+  document.querySelector(".show-new-comp-form-btn")?.addEventListener("click", () => {
+    const form = document.querySelector("#newCompForm");
+    if (form) form.style.display = form.style.display === "none" ? "" : "none";
   });
 
-  const adminSportsRosterSearch = document.querySelector("#adminSportsRosterSearch");
-  const adminSportsRosterResults = document.querySelector("#adminSportsRosterResults");
+  document.querySelector(".cancel-new-comp-btn")?.addEventListener("click", () => {
+    const form = document.querySelector("#newCompForm");
+    if (form) form.style.display = "none";
+  });
 
-  if (adminSportsRosterSearch && adminSportsRosterResults) {
-    adminSportsRosterSearch.addEventListener("input", () => {
-      const matches = getTajnidMatches(adminSportsRosterSearch.value);
-      adminSportsRosterResults.innerHTML = matches.length
-        ? sportsPodiumPositions
-            .map(
-              (position) => `
-                <div class="sports-result-card">
-                  <strong>${position.label}</strong>
-                  ${matches
-                    .map(
-                      (participant) => `
-                        <button class="queue-item admin-add-sports-roster-name" data-position="${position.position}" data-participant="${getEducationParticipantValue(participant)}" type="button">
-                          <span>${participant.code || "No code"}</span>
-                          <strong>${participant.name}</strong>
-                          <small>${participant.halqa}</small>
-                        </button>
-                      `
-                    )
-                    .join("")}
-                </div>
-              `
-            )
-            .join("")
-        : adminSportsRosterSearch.value.trim()
-          ? `<div class="access-note">No tajnid match found. Add the name manually under the correct position.</div>`
-          : "";
-    });
-
-    adminSportsRosterResults.addEventListener("click", (event) => {
-      const button = event.target.closest(".admin-add-sports-roster-name");
-      if (!button) {
-        return;
-      }
-
-      addSportsParticipantToRoster(sportsRosterAdminSport, button.dataset.position, parseEducationParticipantValue(button.dataset.participant));
-      renderDashboard(currentRole);
-    });
-  }
-
-  document.querySelectorAll(".admin-sports-manual-form").forEach((form) => {
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const formData = new FormData(form);
-      addSportsParticipantToRoster(sportsRosterAdminSport, form.dataset.position, {
-        name: formData.get("name"),
-        code: formData.get("code"),
-        halqa: formData.get("halqa"),
+  document.querySelector("#newCompForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const name = (fd.get("name") || "").trim();
+    const category = fd.get("category") || "Education";
+    const type = fd.get("type") || "Individual";
+    if (!name) return;
+    let addedId = null;
+    try {
+      const data = await apiRequest("/api/competitions/add", {
+        method: "POST",
+        body: JSON.stringify({ name, category, type }),
       });
-      renderDashboard(currentRole);
-    });
+      competitionsList = data.competitionsList || competitionsList;
+      addedId = data.addedId;
+    } catch {
+      addedId = `local-${Date.now().toString(36)}`;
+      competitionsList.push({ id: addedId, name, category, type });
+    }
+    if (addedId) selectedCompetitionId = addedId;
+    renderDashboard(currentRole);
   });
 
-  document.querySelectorAll(".remove-sports-roster-name").forEach((button) => {
-    button.addEventListener("click", () => {
-      removeSportsParticipantFromRoster(sportsRosterAdminSport, button.dataset.position, button.dataset.code, button.dataset.name);
+  // Finals Manager: position slot interactions (delegated to #finalsManagerShell — no full re-render)
+  const finalsManagerShell = document.querySelector("#finalsManagerShell");
+
+  if (finalsManagerShell) {
+    finalsManagerShell.querySelector(".add-position-slot-btn")?.addEventListener("click", () => {
+      const container = document.querySelector("#positionSlotsContainer");
+      if (!container) return;
+      const idx = container.querySelectorAll(".position-slot").length;
+      container.insertAdjacentHTML("beforeend", renderPositionSlot({ rank: "1st", members: [{ code: "", name: "", halqa: "" }] }, idx));
+      document.querySelector("#noPositionsNote")?.remove();
+    });
+
+    finalsManagerShell.addEventListener("click", (e) => {
+      if (e.target.closest(".remove-slot-btn")) {
+        e.target.closest(".position-slot")?.remove();
+        return;
+      }
+      if (e.target.closest(".add-member-row-btn")) {
+        const slot = e.target.closest(".position-slot");
+        const memberList = slot?.querySelector(".member-list");
+        if (!memberList) return;
+        const mi = memberList.querySelectorAll(".member-row").length;
+        if (mi >= 20) { alert("Maximum 20 members per position."); return; }
+        memberList.insertAdjacentHTML("beforeend", renderMemberRow({ code: "", name: "", halqa: "" }, mi));
+        return;
+      }
+      if (e.target.closest(".remove-member-row-btn")) {
+        const row = e.target.closest(".member-row");
+        const memberList = row?.closest(".member-list");
+        if (memberList && memberList.querySelectorAll(".member-row").length > 1) row.remove();
+        return;
+      }
+      if (e.target.closest(".member-autocomplete-item")) {
+        const item = e.target.closest(".member-autocomplete-item");
+        const memberRow = item.closest(".member-row");
+        if (!memberRow) return;
+        memberRow.querySelector(".member-code-input").value = item.dataset.code || "";
+        memberRow.querySelector(".member-name-input").value = item.dataset.name || "";
+        const halqaSelect = memberRow.querySelector(".member-halqa-select");
+        if (halqaSelect) halqaSelect.value = item.dataset.halqa || "";
+        const dropdown = item.closest(".member-ac-dropdown");
+        if (dropdown) { dropdown.style.display = "none"; dropdown.innerHTML = ""; }
+        return;
+      }
+    });
+
+    finalsManagerShell.addEventListener("input", (e) => {
+      const codeInput = e.target.closest(".member-code-input");
+      if (!codeInput) return;
+      const memberRow = codeInput.closest(".member-row");
+      const dropdown = memberRow?.querySelector(".member-ac-dropdown");
+      if (!dropdown) return;
+      const matches = getTajnidMatches(codeInput.value, 8);
+      if (!matches.length || !codeInput.value.trim()) {
+        dropdown.style.display = "none";
+        dropdown.innerHTML = "";
+        return;
+      }
+      dropdown.style.display = "";
+      dropdown.innerHTML = matches
+        .map(
+          (m) => `
+          <button class="member-autocomplete-item" type="button"
+            data-code="${escapeAttribute(m.code || "")}"
+            data-name="${escapeAttribute(m.name || "")}"
+            data-halqa="${escapeAttribute(m.halqa || "")}">
+            <strong>${escapeHtml(m.name || "")}</strong>
+            <small>${escapeHtml(m.code || "—")} · ${escapeHtml(m.halqa || "—")}</small>
+          </button>
+        `
+        )
+        .join("");
+    });
+
+    finalsManagerShell.querySelector(".save-all-positions-btn")?.addEventListener("click", async () => {
+      const btn = finalsManagerShell.querySelector(".save-all-positions-btn");
+      const compId = btn?.dataset.compId;
+      if (!compId) return;
+      const slots = collectPositionSlots();
+      try {
+        const data = await apiRequest("/api/competition/finals/save", {
+          method: "POST",
+          body: JSON.stringify({ competitionId: compId, slots }),
+        });
+        competitionFinals = data.competitionFinals || competitionFinals;
+        competitionFinalMsg = "Positions saved.";
+      } catch {
+        const comp = competitionsList.find((c) => c.id === compId);
+        const kept = competitionFinals.filter((f) => f.competitionId !== compId);
+        slots.forEach((slot, idx) => {
+          kept.push({
+            id: `local-${compId}-${idx}`,
+            competitionId: compId,
+            competition: comp?.name || compId,
+            category: comp?.category || "Education",
+            rank: slot.rank,
+            members: slot.members,
+          });
+        });
+        competitionFinals = kept;
+        competitionFinalMsg = "Saved locally (server unavailable).";
+      }
       renderDashboard(currentRole);
     });
-  });
+  }
+
+  // Close autocomplete dropdowns on outside click (one-time global listener)
+  if (!document.body.dataset.acBound) {
+    document.body.dataset.acBound = "true";
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".member-code-wrap")) {
+        document.querySelectorAll(".member-ac-dropdown").forEach((d) => { d.style.display = "none"; d.innerHTML = ""; });
+      }
+    });
+  }
+
+  // Admin export buttons
+  document.querySelector("#exportFinalsPdf")?.addEventListener("click", openFinalsPdfReport);
+  document.querySelector("#exportFinalsExcel")?.addEventListener("click", downloadFinalsCsv);
 
   const adminUserSearchInput = document.querySelector("#adminUserSearchInput");
 
@@ -6549,6 +6852,23 @@ function bindDynamicControls() {
     renderDashboard(currentRole);
   });
 
+  function updateSchedulePreview(form) {
+    const box = document.querySelector("#schedulePreviewBox");
+    if (!box || !form) return;
+    const title = form.elements.title?.value || "Program Name";
+    const start12 = to12h(form.elements.start?.value) || "Start";
+    const end12 = to12h(form.elements.end?.value) || "End";
+    const loc = form.elements.location?.value || "Location";
+    const lead = form.elements.lead?.value || "Lead";
+    const status = getComputedScheduleStatus({ start: start12, end: end12, title, location: loc, lead });
+    box.querySelector("strong").textContent = title;
+    box.querySelectorAll("p")[0].textContent = `${start12} - ${end12}`;
+    box.querySelectorAll("p")[1].textContent = `${loc} - ${lead}`;
+    const pill = box.querySelector(".pill");
+    pill.className = `pill ${status === "Live" ? "pill-success" : "pill-muted"}`;
+    pill.textContent = status;
+  }
+
   const scheduleForm = document.querySelector("#scheduleForm");
 
   if (scheduleForm) {
@@ -6557,14 +6877,14 @@ function bindDynamicControls() {
       const formData = new FormData(scheduleForm);
       const scheduleItem = {
         rowId: editingScheduleRow,
-        start: formData.get("start"),
-        end: formData.get("end"),
+        start: to12h(formData.get("start")),
+        end: to12h(formData.get("end")),
         title: formData.get("title"),
         location: formData.get("location"),
         lead: formData.get("lead"),
         status: getComputedScheduleStatus({
-          start: formData.get("start"),
-          end: formData.get("end"),
+          start: to12h(formData.get("start")),
+          end: to12h(formData.get("end")),
           status: formData.get("status"),
         }),
       };
@@ -6612,11 +6932,34 @@ function bindDynamicControls() {
       form.elements.title.value = button.dataset.title || "";
       form.elements.location.value = button.dataset.location || "";
       form.elements.lead.value = button.dataset.lead || "";
-      form.elements.start.value = button.dataset.start || "";
-      form.elements.end.value = button.dataset.end || "";
+      form.elements.start.value = to24h(button.dataset.start || "");
+      form.elements.end.value = to24h(button.dataset.end || "");
+
+      document.querySelectorAll(".template-chip").forEach((c) => c.classList.remove("is-active"));
+      button.classList.add("is-active");
+
+      updateSchedulePreview(form);
       form.elements.title.focus();
     });
   });
+
+  document.querySelectorAll(".duration-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const form = document.querySelector("#scheduleForm");
+      if (!form || !form.elements.start.value) return;
+      const [hStr, mStr] = form.elements.start.value.split(":");
+      const totalMin = +hStr * 60 + +mStr + parseInt(btn.dataset.dur, 10);
+      const nh = Math.floor(totalMin / 60) % 24;
+      const nm = totalMin % 60;
+      form.elements.end.value = `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`;
+      updateSchedulePreview(form);
+    });
+  });
+
+  const scheduleFormForPreview = document.querySelector("#scheduleForm");
+  if (scheduleFormForPreview) {
+    scheduleFormForPreview.addEventListener("input", () => updateSchedulePreview(scheduleFormForPreview));
+  }
 
   const announcementForm = document.querySelector("#announcementForm");
 
@@ -6795,6 +7138,8 @@ function bindDynamicControls() {
     editingAnnouncementRow = null;
     renderDashboard(currentRole);
   });
+
+  // Education setup and sports result forms no longer rendered — portals use finalPositionsManager now.
 
   const educationSetupForm = document.querySelector("#educationSetupForm");
 
@@ -7231,28 +7576,6 @@ function bindDynamicControls() {
   document.querySelector("#exportSportsCeremonyCsv")?.addEventListener("click", () => {
     downloadSportsCsv();
   });
-
-  bindAvDisplayControls();
-}
-
-function bindAvDisplayControls() {
-  document.querySelector(".av-maximize")?.addEventListener("click", async () => {
-    const display = document.querySelector(".av-display");
-
-    if (!display) {
-      return;
-    }
-
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        await display.requestFullscreen();
-      }
-    } catch (error) {
-      display.classList.toggle("is-browser-fullscreen");
-    }
-  });
 }
 
 function updateAnnouncementPreview() {
@@ -7303,7 +7626,6 @@ function renderDashboard(role) {
   logoutButton.hidden = !currentUser;
   renderNav(role);
   renderPanels(role);
-  manageAvTimer(role);
 }
 
 sidebarToggle?.addEventListener("click", () => {
@@ -7311,24 +7633,6 @@ sidebarToggle?.addEventListener("click", () => {
   appShell?.classList.toggle("is-sidebar-collapsed", isSidebarCollapsed);
   sidebarToggle.setAttribute("aria-label", isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar");
 });
-
-function manageAvTimer(role) {
-  if (avTimer) {
-    clearTimeout(avTimer);
-    avTimer = null;
-  }
-
-  if (role === "av") {
-    const currentSlide = avSlides[avSlideIndex % avSlides.length];
-    const delay = 8000;
-
-    avTimer = setTimeout(() => {
-      avSlideIndex = (avSlideIndex + 1) % avSlides.length;
-      refreshAvDisplayOnly();
-      manageAvTimer("av");
-    }, delay);
-  }
-}
 
 function isEditingForm() {
   const activeElement = document.activeElement;
@@ -7348,11 +7652,7 @@ function startLiveRefresh() {
     try {
       const data = await apiRequest("/api/bootstrap");
       applyBootstrapData(data);
-      if (currentRole === "av") {
-        refreshAvDisplayOnly();
-      } else {
-        renderDashboard(currentRole);
-      }
+      renderDashboard(currentRole);
     } catch (error) {
       // Keep the current screen if the backend is temporarily unavailable.
     }
@@ -7400,21 +7700,31 @@ loginForm.addEventListener("submit", async (event) => {
   }
 
   currentUser = user;
+  localStorage.setItem("dashboardSession", JSON.stringify({ username: user.username }));
   loginError.textContent = "";
   loginScreen.classList.add("is-hidden");
   currentSection = navItems[user.role][0];
   renderDashboard(user.role);
 });
 
+[usernameInput, passwordInput].forEach((input) => {
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      loginForm.requestSubmit();
+    }
+  });
+});
+
 logoutButton.addEventListener("click", () => {
   currentUser = null;
+  localStorage.removeItem("dashboardSession");
   loginForm.reset();
   currentSection = "Overview";
   attendanceSearch = "";
   attendanceMessage = "";
   judgeMessage = "";
   sportsMessage = "";
-  avSlideIndex = 0;
   renderDashboard("public");
 });
 
@@ -7436,6 +7746,23 @@ async function initializeApp() {
   } catch (error) {
     loadEducationRubricsFromStorage();
     console.warn("Backend bootstrap unavailable. Using local sample data.");
+  }
+
+  const saved = localStorage.getItem("dashboardSession");
+  if (saved) {
+    try {
+      const { username } = JSON.parse(saved);
+      const user = dashboardUsers.find((u) => u.username === username);
+      if (user && navItems[user.role]) {
+        currentUser = user;
+        currentSection = navItems[user.role][0];
+        renderDashboard(user.role);
+        startLiveRefresh();
+        startPrayerClock();
+        return;
+      }
+    } catch (_) {}
+    localStorage.removeItem("dashboardSession");
   }
 
   renderDashboard("public");

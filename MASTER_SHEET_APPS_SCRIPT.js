@@ -38,6 +38,7 @@ function setupMasterDashboardSheet() {
   setupTab(spreadsheet, "Users", ["username", "password", "name", "role", "halqa", "access"]);
   setupTab(spreadsheet, "Schedule", ["start", "end", "title", "location", "lead", "status"]);
   setupTab(spreadsheet, "Announcements", ["title", "message", "time", "priority"]);
+  setupTab(spreadsheet, "Master Members", ["code", "name", "halqa", "phone"]);
   setupTab(spreadsheet, "Members", ["code", "name", "halqa", "registered", "attended", "checkIn"]);
   setupTab(spreadsheet, "Attendance", ["code", "name", "halqa", "checkIn", "checkedInBy"]);
   setupTab(spreadsheet, "Competition Results", ["category", "competition", "position", "name", "halqa", "points"]);
@@ -48,6 +49,7 @@ function setupMasterDashboardSheet() {
   seedUsers(spreadsheet);
   seedSchedule(spreadsheet);
   seedAnnouncements(spreadsheet);
+  seedDemoMasterMembers(spreadsheet.getSheetByName("Master Members"));
   setupMembersImport(spreadsheet);
   setupCompetitionResultsImport(spreadsheet);
   setupHalqaRankings(spreadsheet);
@@ -182,6 +184,20 @@ function seedDemoMembers(sheet) {
   sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
 }
 
+function seedDemoMasterMembers(sheet) {
+  const rows = [];
+
+  HALQAJAT.forEach((halqa, index) => {
+    const baseCode = (index + 1) * 100;
+    rows.push([`M${baseCode + 1}`, `Member ${baseCode + 1}`, halqa, ""]);
+    rows.push([`M${baseCode + 2}`, `Member ${baseCode + 2}`, halqa, ""]);
+    rows.push([`M${baseCode + 3}`, `Member ${baseCode + 3}`, halqa, ""]);
+    rows.push([`M${baseCode + 4}`, `Member ${baseCode + 4}`, halqa, ""]);
+  });
+
+  sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+}
+
 function doGet(e) {
   const action = e && e.parameter && e.parameter.action ? e.parameter.action : "bootstrap";
 
@@ -273,13 +289,17 @@ function jsonResponse(payload) {
 
 function getBootstrapPayload() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const masterMembers = normalizeMasterMembers(rowsToObjects(spreadsheet.getSheetByName("Master Members").getDataRange().getValues()));
+  const registrations = normalizeMembers(rowsToObjects(spreadsheet.getSheetByName("Members").getDataRange().getValues()));
 
   return {
     halqajat: HALQAJAT,
     users: rowsToObjects(spreadsheet.getSheetByName("Users").getDataRange().getValues()),
     scheduleItems: rowsToObjects(spreadsheet.getSheetByName("Schedule").getDataRange().getValues()),
     announcements: rowsToObjects(spreadsheet.getSheetByName("Announcements").getDataRange().getValues()),
-    memberRecords: normalizeMembers(rowsToObjects(spreadsheet.getSheetByName("Members").getDataRange().getValues())),
+    masterMemberRecords: masterMembers,
+    registrationRecords: registrations,
+    memberRecords: mergeMasterAndRegistrations(masterMembers, registrations),
     attendanceRecords: rowsToObjects(spreadsheet.getSheetByName("Attendance").getDataRange().getValues()),
     competitionResults: rowsToObjects(spreadsheet.getSheetByName("Competition Results").getDataRange().getValues()),
     halqaRankings: normalizeRankings(rowsToObjects(spreadsheet.getSheetByName("Halqa Rankings").getDataRange().getValues())),
@@ -326,6 +346,45 @@ function normalizeMembers(rows) {
   }));
 }
 
+function normalizeMasterMembers(rows) {
+  return rows.map((row) => ({
+    code: row.code,
+    name: row.name,
+    halqa: row.halqa,
+    phone: row.phone || "",
+    registered: false,
+    attended: false,
+    checkIn: "",
+    source: "master",
+  }));
+}
+
+function mergeMasterAndRegistrations(masterMembers, registrations) {
+  const registrationByCode = {};
+  registrations.forEach((member) => {
+    registrationByCode[String(member.code || "").trim()] = member;
+  });
+
+  const merged = masterMembers.map((member) => {
+    const registration = registrationByCode[String(member.code || "").trim()];
+    return {
+      ...member,
+      registered: Boolean(registration),
+      attended: Boolean(registration && registration.attended),
+      checkIn: registration ? registration.checkIn || "" : "",
+    };
+  });
+
+  registrations.forEach((registration) => {
+    const exists = merged.some((member) => String(member.code || "").trim() === String(registration.code || "").trim());
+    if (!exists) {
+      merged.push({ ...registration, source: "registration-only" });
+    }
+  });
+
+  return merged;
+}
+
 function normalizeRankings(rows) {
   return rows.map((row) => ({
     halqa: row.halqa,
@@ -341,14 +400,27 @@ function recordAttendance(payload) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const attendanceSheet = spreadsheet.getSheetByName("Attendance");
   const membersSheet = spreadsheet.getSheetByName("Members");
-  const members = normalizeMembers(rowsToObjects(membersSheet.getDataRange().getValues()));
-  const member = members.find((item) => item.code === payload.code);
+  const masterMembersSheet = spreadsheet.getSheetByName("Master Members");
+  const registrations = normalizeMembers(rowsToObjects(membersSheet.getDataRange().getValues()));
+  const masterMembers = normalizeMasterMembers(rowsToObjects(masterMembersSheet.getDataRange().getValues()));
+  let members = mergeMasterAndRegistrations(masterMembers, registrations);
+  let member = members.find((item) => String(item.code || "").trim() === String(payload.code || "").trim());
 
   if (!member) {
-    return { error: "Member was not found." };
+    const manual = payload.member || payload;
+    const code = String(manual.code || "").trim() || `WALK-${Date.now().toString(36)}`;
+    const name = String(manual.name || "").trim();
+    const halqa = String(manual.halqa || "").trim();
+
+    if (!name || !halqa) {
+      return { error: "Member was not found. Enter name and halqa to add a manual walk-in." };
+    }
+
+    member = { code, name, halqa, registered: false, attended: false, checkIn: "", source: "walk-in" };
+    members.push(member);
   }
 
-  const existing = rowsToObjects(attendanceSheet.getDataRange().getValues()).find((item) => item.code === payload.code);
+  const existing = rowsToObjects(attendanceSheet.getDataRange().getValues()).find((item) => String(item.code || "").trim() === String(member.code || "").trim());
 
   if (existing) {
     return { error: `${member.name} is already checked in.`, attendanceRecords: rowsToObjects(attendanceSheet.getDataRange().getValues()) };
