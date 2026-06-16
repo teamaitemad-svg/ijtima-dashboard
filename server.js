@@ -6,9 +6,12 @@ const {
   appendAnnouncement,
   appendAttendance,
   appendScheduleItem,
+  deleteDocument,
   isSheetsConfigured,
   readBootstrap,
+  readDocuments,
   readUsers,
+  saveDocument,
 } = require("./sheetsStore");
 
 const PORT = process.env.PORT || 3000;
@@ -986,7 +989,7 @@ async function handleApi(request, response, url) {
   }
 
   if (request.method === "GET" && requestPath === "/api/documents") {
-    const stored = readDocumentsFile();
+    const stored = (await readDocuments()) || readDocumentsFile();
     const docs = ALLOWED_DOCUMENT_KEYS.map((key) => {
       const entry = stored[key];
       return entry ? { key, uploaded: true, url: entry.url, label: entry.label, updatedAt: entry.updatedAt } : { key, uploaded: false };
@@ -1008,6 +1011,11 @@ async function handleApi(request, response, url) {
       sendError(response, 400, "URL is required.");
       return true;
     }
+    if (isSheetsConfigured()) {
+      const saved = await saveDocument(key, url, label);
+      sendJson(response, 200, { key, uploaded: true, url: saved.url, label: saved.label, updatedAt: saved.updatedAt });
+      return true;
+    }
     const stored = readDocumentsFile();
     stored[key] = { url, label, updatedAt: Date.now() };
     writeDocumentsFile(stored);
@@ -1020,6 +1028,11 @@ async function handleApi(request, response, url) {
     const key = String(body.key || "").trim();
     if (!ALLOWED_DOCUMENT_KEYS.includes(key)) {
       sendError(response, 400, "Unknown document key.");
+      return true;
+    }
+    if (isSheetsConfigured()) {
+      await deleteDocument(key);
+      sendJson(response, 200, { key, uploaded: false });
       return true;
     }
     const stored = readDocumentsFile();

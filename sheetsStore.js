@@ -1,4 +1,4 @@
-const { appendValues, getValues, isSheetsConfigured } = require("./sheetsClient");
+const { appendValues, updateValues, clearValues, getValues, isSheetsConfigured } = require("./sheetsClient");
 
 const tabs = {
   users: "Users",
@@ -9,6 +9,7 @@ const tabs = {
   attendance: "Attendance",
   rankings: "Halqa Rankings",
   competitions: "Competition Results",
+  documents: "Documents",
 };
 
 function truthy(value) {
@@ -186,12 +187,65 @@ async function appendAttendance(record) {
   await appendValues(tabs.attendance, "A:E", [[record.code, record.name, record.halqa, record.checkIn, record.checkedInBy]]);
 }
 
+async function readDocuments() {
+  if (!isSheetsConfigured()) {
+    return null;
+  }
+
+  const rows = await getValues(tabs.documents, "A2:D").catch(() => []);
+  const documents = {};
+  rows.forEach((row) => {
+    const key = String(row[0] || "").trim();
+    const url = String(row[1] || "").trim();
+    if (!key || !url) return;
+    documents[key] = { url, label: row[2] || "", updatedAt: Number(row[3]) || Date.now() };
+  });
+  return documents;
+}
+
+async function findDocumentRow(key) {
+  const rows = await getValues(tabs.documents, "A2:D").catch(() => []);
+  const index = rows.findIndex((row) => String(row[0] || "").trim() === key);
+  return index === -1 ? null : index + 2;
+}
+
+async function saveDocument(key, url, label) {
+  if (!isSheetsConfigured()) {
+    return null;
+  }
+
+  const updatedAt = Date.now();
+  const rowNumber = await findDocumentRow(key);
+
+  if (rowNumber) {
+    await updateValues(tabs.documents, `A${rowNumber}:D${rowNumber}`, [[key, url, label, updatedAt]]);
+  } else {
+    await appendValues(tabs.documents, "A:D", [[key, url, label, updatedAt]]);
+  }
+
+  return { key, url, label, updatedAt };
+}
+
+async function deleteDocument(key) {
+  if (!isSheetsConfigured()) {
+    return;
+  }
+
+  const rowNumber = await findDocumentRow(key);
+  if (rowNumber) {
+    await clearValues(tabs.documents, `A${rowNumber}:D${rowNumber}`);
+  }
+}
+
 module.exports = {
   appendAnnouncement,
   appendAttendance,
   appendScheduleItem,
+  deleteDocument,
   isSheetsConfigured,
   readBootstrap,
+  readDocuments,
   readUsers,
+  saveDocument,
   tabs,
 };

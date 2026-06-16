@@ -112,8 +112,24 @@ async function appendValues(tabName, cellRange, values) {
   });
 }
 
+async function updateValues(tabName, cellRange, values) {
+  return sheetsRequest(`/values${range(tabName, cellRange)}?valueInputOption=USER_ENTERED`, {
+    method: "PUT",
+    body: JSON.stringify({ values }),
+  });
+}
+
+async function clearValues(tabName, cellRange) {
+  return sheetsRequest(`/values${range(tabName, cellRange)}:clear`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
 module.exports = {
   appendValues,
+  updateValues,
+  clearValues,
   getValues,
   isSheetsConfigured,
 };
