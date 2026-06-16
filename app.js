@@ -3551,6 +3551,48 @@ function getRegistrationStats() {
   };
 }
 
+function renderRegistrationResultsHTML() {
+  const rows = getRegistrationRows();
+  const totalPages = Math.max(1, Math.ceil(rows.length / registrationPerPage));
+  const safePage = Math.min(registrationPage, totalPages);
+  const pageRows = rows.slice((safePage - 1) * registrationPerPage, safePage * registrationPerPage);
+  return `
+    <div class="registration-pagination-bar">
+      <div class="pagination-per-page">
+        <span>Show</span>
+        ${[25, 50, 100, 200].map((n) => `<button class="pagination-size-btn ${registrationPerPage === n ? "is-active" : ""}" data-size="${n}" type="button">${n}</button>`).join("")}
+        <span>per page</span>
+      </div>
+      <div class="pagination-nav">
+        <span>${rows.length} total</span>
+        <button class="secondary-button compact pagination-prev" type="button" ${safePage <= 1 ? "disabled" : ""}>&#8249; Prev</button>
+        <span class="pagination-label">Page ${safePage} of ${totalPages}</span>
+        <button class="secondary-button compact pagination-next" type="button" ${safePage >= totalPages ? "disabled" : ""}>Next &#8250;</button>
+      </div>
+    </div>
+    <div class="detail-table registration-ops-table" role="table" aria-label="Registration list">
+      <div class="detail-row registration-row detail-head" role="row">
+        <span>Code</span>
+        <span>Name</span>
+        <span>Halqa</span>
+        <span>Registered</span>
+        <span>Check-In</span>
+        <span>Status</span>
+      </div>
+      ${pageRows.map((member) => `
+        <div class="detail-row registration-row" role="row">
+          <strong>${member.code || "-"}</strong>
+          <span>${member.name || "-"}</span>
+          <span>${member.halqa || "-"}</span>
+          <span class="pill ${member.registered ? "pill-success" : "pill-muted"}">${member.registered ? "Yes" : "No"}</span>
+          <span>${getMemberCheckIn(member) || "-"}</span>
+          <span class="pill ${isMemberPresent(member) ? "pill-success" : "pill-muted"}">${isMemberPresent(member) ? "Present" : "Pending"}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderAdminRegistrations() {
   const stats = getRegistrationStats();
   const rows = getRegistrationRows();
@@ -3713,50 +3755,7 @@ function renderAdminRegistrations() {
         </div>
       </section>
 
-      ${(() => {
-        const totalPages = Math.max(1, Math.ceil(rows.length / registrationPerPage));
-        const safePage = Math.min(registrationPage, totalPages);
-        const pageRows = rows.slice((safePage - 1) * registrationPerPage, safePage * registrationPerPage);
-        return `
-          <div class="registration-pagination-bar">
-            <div class="pagination-per-page">
-              <span>Show</span>
-              ${[25, 50, 100, 200].map((n) => `<button class="pagination-size-btn ${registrationPerPage === n ? "is-active" : ""}" data-size="${n}" type="button">${n}</button>`).join("")}
-              <span>per page</span>
-            </div>
-            <div class="pagination-nav">
-              <span>${rows.length} total</span>
-              <button class="secondary-button compact pagination-prev" type="button" ${safePage <= 1 ? "disabled" : ""}>&#8249; Prev</button>
-              <span class="pagination-label">Page ${safePage} of ${totalPages}</span>
-              <button class="secondary-button compact pagination-next" type="button" ${safePage >= totalPages ? "disabled" : ""}>Next &#8250;</button>
-            </div>
-          </div>
-          <div class="detail-table registration-ops-table" role="table" aria-label="Registration list">
-            <div class="detail-row registration-row detail-head" role="row">
-              <span>Code</span>
-              <span>Name</span>
-              <span>Halqa</span>
-              <span>Registered</span>
-              <span>Check-In</span>
-              <span>Status</span>
-            </div>
-            ${pageRows
-              .map(
-                (member) => `
-                  <div class="detail-row registration-row" role="row">
-                    <strong>${member.code || "-"}</strong>
-                    <span>${member.name || "-"}</span>
-                    <span>${member.halqa || "-"}</span>
-                    <span class="pill ${member.registered ? "pill-success" : "pill-muted"}">${member.registered ? "Yes" : "No"}</span>
-                    <span>${getMemberCheckIn(member) || "-"}</span>
-                    <span class="pill ${isMemberPresent(member) ? "pill-success" : "pill-muted"}">${isMemberPresent(member) ? "Present" : "Pending"}</span>
-                  </div>
-                `
-              )
-              .join("")}
-          </div>
-        `;
-      })()}
+      <div id="registrationResultsContainer">${renderRegistrationResultsHTML()}</div>
     </section>
   `;
 }
@@ -4041,6 +4040,55 @@ async function markAttendanceRowsAbsent(rows = getAttendanceReportRows()) {
   renderDashboard(currentRole);
 }
 
+function renderAttendanceReportResultsHTML() {
+  const rows = getAttendanceReportRows();
+  const totalPages = Math.max(1, Math.ceil(rows.length / attendanceReportPerPage));
+  const safePage = Math.min(attendanceReportPage, totalPages);
+  const pageRows = rows.slice((safePage - 1) * attendanceReportPerPage, safePage * attendanceReportPerPage);
+  return `
+    <div class="registration-pagination-bar">
+      <div class="pagination-per-page">
+        <span>Show</span>
+        ${[25, 50, 100, 200].map((n) => `<button class="attendance-size-btn pagination-size-btn ${attendanceReportPerPage === n ? "is-active" : ""}" data-size="${n}" type="button">${n}</button>`).join("")}
+        <span>per page</span>
+      </div>
+      <div class="pagination-nav">
+        <span>${rows.length} total</span>
+        <button class="secondary-button compact attendance-page-prev" type="button" ${safePage <= 1 ? "disabled" : ""}>&#8249; Prev</button>
+        <span class="pagination-label">Page ${safePage} of ${totalPages}</span>
+        <button class="secondary-button compact attendance-page-next" type="button" ${safePage >= totalPages ? "disabled" : ""}>Next &#8250;</button>
+      </div>
+    </div>
+    <div class="detail-table attendance-ops-table" role="table" aria-label="Attendance report">
+      <div class="detail-row attendance-report-row detail-head" role="row">
+        <span>Code</span>
+        <span>Name</span>
+        <span>Halqa</span>
+        <span>Status</span>
+        <span>Check-In Time</span>
+        <span>Checked In By</span>
+      </div>
+      ${pageRows.map((member) => {
+        const attendanceRecord = getAttendanceRecordForMember(member.code) || {};
+        const present = isMemberPresent(member);
+        const checkInTime = getMemberCheckIn(member) || attendanceRecord.checkIn || "-";
+        const statusLabel = present ? "Present" : "Pending";
+        const checkedInBy = attendanceRecord.checkedInBy || (present ? "Check-in desk" : "-");
+        return `
+          <div class="detail-row attendance-report-row" role="row">
+            <strong>${member.code || "-"}</strong>
+            <span>${member.name || "-"}</span>
+            <span>${member.halqa || "-"}</span>
+            <span class="pill ${present ? "pill-success" : "pill-muted"}">${statusLabel}</span>
+            <span>${checkInTime}</span>
+            <span>${checkedInBy}</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function renderAdminAttendanceReports() {
   const stats = getAttendanceReportStats();
   const rows = getAttendanceReportRows();
@@ -4229,55 +4277,7 @@ function renderAdminAttendanceReports() {
         </div>
       </section>
 
-      ${(() => {
-        const totalPages = Math.max(1, Math.ceil(rows.length / attendanceReportPerPage));
-        const safePage = Math.min(attendanceReportPage, totalPages);
-        const pageRows = rows.slice((safePage - 1) * attendanceReportPerPage, safePage * attendanceReportPerPage);
-        return `
-          <div class="registration-pagination-bar">
-            <div class="pagination-per-page">
-              <span>Show</span>
-              ${[25, 50, 100, 200].map((n) => `<button class="attendance-size-btn pagination-size-btn ${attendanceReportPerPage === n ? "is-active" : ""}" data-size="${n}" type="button">${n}</button>`).join("")}
-              <span>per page</span>
-            </div>
-            <div class="pagination-nav">
-              <span>${rows.length} total</span>
-              <button class="secondary-button compact attendance-page-prev" type="button" ${safePage <= 1 ? "disabled" : ""}>&#8249; Prev</button>
-              <span class="pagination-label">Page ${safePage} of ${totalPages}</span>
-              <button class="secondary-button compact attendance-page-next" type="button" ${safePage >= totalPages ? "disabled" : ""}>Next &#8250;</button>
-            </div>
-          </div>
-          <div class="detail-table attendance-ops-table" role="table" aria-label="Attendance report">
-            <div class="detail-row attendance-report-row detail-head" role="row">
-              <span>Code</span>
-              <span>Name</span>
-              <span>Halqa</span>
-              <span>Status</span>
-              <span>Check-In Time</span>
-              <span>Checked In By</span>
-            </div>
-            ${pageRows
-              .map((member) => {
-                const attendanceRecord = getAttendanceRecordForMember(member.code) || {};
-                const present = isMemberPresent(member);
-                const checkInTime = getMemberCheckIn(member) || attendanceRecord.checkIn || "-";
-                const statusLabel = present ? "Present" : "Pending";
-                const checkedInBy = attendanceRecord.checkedInBy || (present ? "Check-in desk" : "-");
-                return `
-                  <div class="detail-row attendance-report-row" role="row">
-                    <strong>${member.code || "-"}</strong>
-                    <span>${member.name || "-"}</span>
-                    <span>${member.halqa || "-"}</span>
-                    <span class="pill ${present ? "pill-success" : "pill-muted"}">${statusLabel}</span>
-                    <span>${checkInTime}</span>
-                    <span>${checkedInBy}</span>
-                  </div>
-                `;
-              })
-              .join("")}
-          </div>
-        `;
-      })()}
+      <div id="attendanceReportResultsContainer">${renderAttendanceReportResultsHTML()}</div>
     </section>
   `;
 }
@@ -4773,6 +4773,35 @@ function renderAdminDocuments() {
   `;
 }
 
+function renderAdminUserTableHTML() {
+  const rows = getAdminUserRows();
+  return `
+    <div class="detail-table" role="table" aria-label="Admin users">
+      <div class="detail-row users-row detail-head" role="row">
+        <span>Username</span>
+        <span>Name</span>
+        <span>Role</span>
+        <span>Halqa</span>
+        <span>Access</span>
+        <span>Actions</span>
+      </div>
+      ${rows.map((user) => `
+        <div class="detail-row users-row" role="row">
+          <strong>${user.username || "-"}</strong>
+          <span>${user.name || "-"}</span>
+          <span class="pill pill-muted">${user.role || "-"}</span>
+          <span>${user.halqa || "-"}</span>
+          <span>${user.access || "-"}</span>
+          <span class="row-actions">
+            <button class="secondary-button edit-user-item" data-row="${getRowId(user, dashboardUsers.indexOf(user))}" type="button">Edit</button>
+            <button class="danger-button delete-user-item" data-row="${getRowId(user, dashboardUsers.indexOf(user))}" type="button">Delete</button>
+          </span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderAdminUsers() {
   const rows = getAdminUserRows();
   const roleCounts = getRoleCounts();
@@ -4851,33 +4880,7 @@ function renderAdminUsers() {
       </label>
     </div>
 
-    <div class="detail-table" role="table" aria-label="Admin users">
-      <div class="detail-row users-row detail-head" role="row">
-        <span>Username</span>
-        <span>Name</span>
-        <span>Role</span>
-        <span>Halqa</span>
-        <span>Access</span>
-        <span>Actions</span>
-      </div>
-      ${rows
-        .map(
-          (user) => `
-            <div class="detail-row users-row" role="row">
-              <strong>${user.username || "-"}</strong>
-              <span>${user.name || "-"}</span>
-              <span class="pill pill-muted">${user.role || "-"}</span>
-              <span>${user.halqa || "-"}</span>
-              <span>${user.access || "-"}</span>
-              <span class="row-actions">
-                <button class="secondary-button edit-user-item" data-row="${getRowId(user, dashboardUsers.indexOf(user))}" type="button">Edit</button>
-                <button class="danger-button delete-user-item" data-row="${getRowId(user, dashboardUsers.indexOf(user))}" type="button">Delete</button>
-              </span>
-            </div>
-          `
-        )
-        .join("")}
-    </div>
+    <div id="adminUserResultsContainer">${renderAdminUserTableHTML()}</div>
   `;
 }
 
@@ -6624,19 +6627,70 @@ function bindDynamicControls() {
     renderDashboard(currentRole);
   });
 
+  function attachRegistrationPaginationListeners(container) {
+    if (!container) return;
+    container.querySelectorAll(".pagination-size-btn").forEach((button) => {
+      button.addEventListener("click", () => {
+        registrationPerPage = parseInt(button.dataset.size, 10);
+        registrationPage = 1;
+        renderDashboard(currentRole);
+      });
+    });
+    container.querySelector(".pagination-prev")?.addEventListener("click", () => {
+      if (registrationPage > 1) { registrationPage--; renderDashboard(currentRole); }
+    });
+    container.querySelector(".pagination-next")?.addEventListener("click", () => {
+      registrationPage++;
+      renderDashboard(currentRole);
+    });
+  }
+
+  function updateRegistrationResults() {
+    const container = document.querySelector("#registrationResultsContainer");
+    if (!container) return;
+    registrationPage = 1;
+    container.innerHTML = renderRegistrationResultsHTML();
+    attachRegistrationPaginationListeners(container);
+  }
+
+  function attachAttendanceReportPaginationListeners(container) {
+    if (!container) return;
+    container.querySelectorAll(".attendance-size-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        attendanceReportPerPage = parseInt(btn.dataset.size, 10);
+        attendanceReportPage = 1;
+        renderDashboard(currentRole);
+      });
+    });
+    container.querySelector(".attendance-page-prev")?.addEventListener("click", () => {
+      if (attendanceReportPage > 1) { attendanceReportPage--; renderDashboard(currentRole); }
+    });
+    container.querySelector(".attendance-page-next")?.addEventListener("click", () => {
+      attendanceReportPage++;
+      renderDashboard(currentRole);
+    });
+  }
+
+  function updateAttendanceReportResults() {
+    const container = document.querySelector("#attendanceReportResultsContainer");
+    if (!container) return;
+    attendanceReportPage = 1;
+    container.innerHTML = renderAttendanceReportResultsHTML();
+    attachAttendanceReportPaginationListeners(container);
+  }
+
+  function updateAdminUserResults() {
+    const container = document.querySelector("#adminUserResultsContainer");
+    if (!container) return;
+    container.innerHTML = renderAdminUserTableHTML();
+  }
+
   const registrationSearchInput = document.querySelector("#registrationSearchInput");
 
   if (registrationSearchInput) {
     registrationSearchInput.addEventListener("input", (event) => {
       registrationSearch = event.target.value;
-      registrationPage = 1;
-      const cursorPos = event.target.selectionStart;
-      renderDashboard(currentRole);
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        const refreshedInput = document.querySelector("#registrationSearchInput");
-        refreshedInput?.focus();
-        refreshedInput?.setSelectionRange(cursorPos, cursorPos);
-      }));
+      updateRegistrationResults();
     });
   }
 
@@ -6658,25 +6712,7 @@ function bindDynamicControls() {
     });
   });
 
-  document.querySelectorAll(".pagination-size-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      registrationPerPage = parseInt(button.dataset.size, 10);
-      registrationPage = 1;
-      renderDashboard(currentRole);
-    });
-  });
-
-  document.querySelector(".pagination-prev")?.addEventListener("click", () => {
-    if (registrationPage > 1) {
-      registrationPage--;
-      renderDashboard(currentRole);
-    }
-  });
-
-  document.querySelector(".pagination-next")?.addEventListener("click", () => {
-    registrationPage++;
-    renderDashboard(currentRole);
-  });
+  attachRegistrationPaginationListeners(document.querySelector("#registrationResultsContainer"));
 
   document.querySelector("#registrationStatusFilter")?.addEventListener("change", (event) => {
     registrationStatusFilter = event.target.value;
@@ -6697,14 +6733,7 @@ function bindDynamicControls() {
   if (attendanceReportSearchInput) {
     attendanceReportSearchInput.addEventListener("input", (event) => {
       attendanceReportSearch = event.target.value;
-      attendanceReportPage = 1;
-      const cursorPos = event.target.selectionStart;
-      renderDashboard(currentRole);
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        const refreshedInput = document.querySelector("#attendanceReportSearchInput");
-        refreshedInput?.focus();
-        refreshedInput?.setSelectionRange(cursorPos, cursorPos);
-      }));
+      updateAttendanceReportResults();
     });
   }
 
@@ -6744,25 +6773,7 @@ function bindDynamicControls() {
     exportAttendanceCsv();
   });
 
-  document.querySelectorAll(".attendance-size-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      attendanceReportPerPage = parseInt(btn.dataset.size, 10);
-      attendanceReportPage = 1;
-      renderDashboard(currentRole);
-    });
-  });
-
-  document.querySelector(".attendance-page-prev")?.addEventListener("click", () => {
-    if (attendanceReportPage > 1) {
-      attendanceReportPage--;
-      renderDashboard(currentRole);
-    }
-  });
-
-  document.querySelector(".attendance-page-next")?.addEventListener("click", () => {
-    attendanceReportPage++;
-    renderDashboard(currentRole);
-  });
+  attachAttendanceReportPaginationListeners(document.querySelector("#attendanceReportResultsContainer"));
 
   // Finals Manager: tab switcher
   document.querySelectorAll(".fp-tab-btn").forEach((btn) => {
@@ -6999,13 +7010,7 @@ function bindDynamicControls() {
   if (adminUserSearchInput) {
     adminUserSearchInput.addEventListener("input", (event) => {
       adminUserSearch = event.target.value;
-      const cursorPos = event.target.selectionStart;
-      renderDashboard(currentRole);
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        const refreshedInput = document.querySelector("#adminUserSearchInput");
-        refreshedInput?.focus();
-        refreshedInput?.setSelectionRange(cursorPos, cursorPos);
-      }));
+      updateAdminUserResults();
     });
   }
 
@@ -7066,33 +7071,30 @@ function bindDynamicControls() {
     });
   }
 
-  document.querySelectorAll(".edit-user-item").forEach((button) => {
-    button.addEventListener("click", () => {
-      editingUserRow = button.dataset.row;
-      renderDashboard(currentRole);
-    });
-  });
-
-  document.querySelectorAll(".delete-user-item").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const rowId = button.dataset.row;
-
-      try {
-        const data = await apiRequest("/api/admin/users/delete", {
-          method: "POST",
-          body: JSON.stringify({ rowId }),
-        });
-        dashboardUsers = data.users;
-      } catch (error) {
-        dashboardUsers = dashboardUsers.filter((user, index) => getRowId(user, index) !== rowId);
+  const adminUserResultsContainer = document.querySelector("#adminUserResultsContainer");
+  if (adminUserResultsContainer) {
+    adminUserResultsContainer.addEventListener("click", async (e) => {
+      const editBtn = e.target.closest(".edit-user-item");
+      const deleteBtn = e.target.closest(".delete-user-item");
+      if (editBtn) {
+        editingUserRow = editBtn.dataset.row;
+        renderDashboard(currentRole);
+      } else if (deleteBtn) {
+        const rowId = deleteBtn.dataset.row;
+        try {
+          const data = await apiRequest("/api/admin/users/delete", {
+            method: "POST",
+            body: JSON.stringify({ rowId }),
+          });
+          dashboardUsers = data.users;
+        } catch (error) {
+          dashboardUsers = dashboardUsers.filter((user, index) => getRowId(user, index) !== rowId);
+        }
+        if (editingUserRow === rowId) editingUserRow = null;
+        renderDashboard(currentRole);
       }
-
-      if (editingUserRow === rowId) {
-        editingUserRow = null;
-      }
-      renderDashboard(currentRole);
     });
-  });
+  }
 
   document.querySelector(".cancel-user-edit")?.addEventListener("click", () => {
     editingUserRow = null;

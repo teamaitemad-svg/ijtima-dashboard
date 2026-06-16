@@ -7152,3 +7152,9 @@ a.wide-soft-action {
     font-size: 18px;
   }
 }
+
+#registrationResultsContainer,
+#attendanceReportResultsContainer,
+#adminUserResultsContainer {
+  display: contents;
+}
