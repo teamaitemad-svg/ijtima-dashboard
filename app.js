@@ -6630,10 +6630,13 @@ function bindDynamicControls() {
     registrationSearchInput.addEventListener("input", (event) => {
       registrationSearch = event.target.value;
       registrationPage = 1;
+      const cursorPos = event.target.selectionStart;
       renderDashboard(currentRole);
-      const refreshedInput = document.querySelector("#registrationSearchInput");
-      refreshedInput?.focus();
-      refreshedInput?.setSelectionRange(registrationSearch.length, registrationSearch.length);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const refreshedInput = document.querySelector("#registrationSearchInput");
+        refreshedInput?.focus();
+        refreshedInput?.setSelectionRange(cursorPos, cursorPos);
+      }));
     });
   }
 
@@ -6695,10 +6698,13 @@ function bindDynamicControls() {
     attendanceReportSearchInput.addEventListener("input", (event) => {
       attendanceReportSearch = event.target.value;
       attendanceReportPage = 1;
+      const cursorPos = event.target.selectionStart;
       renderDashboard(currentRole);
-      const refreshedInput = document.querySelector("#attendanceReportSearchInput");
-      refreshedInput?.focus();
-      refreshedInput?.setSelectionRange(attendanceReportSearch.length, attendanceReportSearch.length);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const refreshedInput = document.querySelector("#attendanceReportSearchInput");
+        refreshedInput?.focus();
+        refreshedInput?.setSelectionRange(cursorPos, cursorPos);
+      }));
     });
   }
 
@@ -6993,10 +6999,13 @@ function bindDynamicControls() {
   if (adminUserSearchInput) {
     adminUserSearchInput.addEventListener("input", (event) => {
       adminUserSearch = event.target.value;
+      const cursorPos = event.target.selectionStart;
       renderDashboard(currentRole);
-      const refreshedInput = document.querySelector("#adminUserSearchInput");
-      refreshedInput?.focus();
-      refreshedInput?.setSelectionRange(adminUserSearch.length, adminUserSearch.length);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const refreshedInput = document.querySelector("#adminUserSearchInput");
+        refreshedInput?.focus();
+        refreshedInput?.setSelectionRange(cursorPos, cursorPos);
+      }));
     });
   }
 
