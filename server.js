@@ -326,7 +326,11 @@ function normalizeManualMember(body) {
 }
 
 function getCurrentCheckInTime() {
-  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const now = new Date();
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const datePart = `${months[now.getMonth()]} ${now.getDate()}`;
+  const timePart = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return `${datePart}, ${timePart}`;
 }
 
 function getRowId(item, index) {

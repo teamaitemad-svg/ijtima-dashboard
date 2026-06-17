@@ -50,6 +50,10 @@ let attendanceReportHalqaFilter = "All";
 let attendanceReportStatusFilter = "All";
 let attendanceReportPage = 1;
 let attendanceReportPerPage = 50;
+let zaimRegistrationSearch = "";
+let zaimRegistrationStatusFilter = "All";
+let zaimAttendanceSearch = "";
+let zaimAttendanceStatusFilter = "All";
 let announcementFilter = "all";
 let competitionAdminCategoryFilter = "All";
 let competitionAdminSearch = "";
@@ -496,7 +500,7 @@ function downloadCsv(filename, headers, rows) {
   URL.revokeObjectURL(url);
 }
 
-function printInPage(title, summaryRows, tableHeaders, tableRows) {
+function printInPage(reportType, subtitle, summaryRows, tableHeaders, tableRows) {
   const generatedAt = new Date().toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 
   const summaryMarkup = summaryRows
@@ -510,7 +514,15 @@ function printInPage(title, summaryRows, tableHeaders, tableRows) {
   const overlay = document.createElement("div");
   overlay.id = "ipr-overlay";
   overlay.innerHTML = `
-    <h1>${escapeHtml(title)}</h1>
+    <div class="ipr-header">
+      <img class="ipr-logo" src="/logo.png" alt="Majlis Muqami MKAC Ijtima" />
+      <div class="ipr-header-center">
+        <h1>Majlis Muqami MKAC Ijtima</h1>
+        <p class="ipr-report-type">${escapeHtml(reportType)}</p>
+        ${subtitle ? `<p class="ipr-subtitle">${escapeHtml(subtitle)}</p>` : ""}
+      </div>
+      <div class="ipr-header-spacer"></div>
+    </div>
     <p class="ipr-meta">Generated ${escapeHtml(generatedAt)}</p>
     <div class="ipr-metrics">${summaryMarkup}</div>
     <table>
@@ -528,8 +540,13 @@ function printInPage(title, summaryRows, tableHeaders, tableRows) {
       color: #0f172a;
       padding: 24px;
     }
-    #ipr-overlay h1 { margin: 0 0 4px; font-size: 22px; }
-    #ipr-overlay .ipr-meta { margin: 0 0 16px; color: #64748b; font-size: 12px; }
+    #ipr-overlay .ipr-header { display: grid; grid-template-columns: 90px 1fr 90px; align-items: center; gap: 12px; }
+    #ipr-overlay .ipr-logo { height: 60px; width: auto; justify-self: start; }
+    #ipr-overlay .ipr-header-center { text-align: center; }
+    #ipr-overlay .ipr-header-center h1 { margin: 0; font-size: 20px; }
+    #ipr-overlay .ipr-report-type { margin: 4px 0 0; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #0f766e; }
+    #ipr-overlay .ipr-subtitle { margin: 2px 0 0; font-size: 12px; color: #475569; }
+    #ipr-overlay .ipr-meta { margin: 10px 0 16px; color: #64748b; font-size: 12px; text-align: center; }
     #ipr-overlay .ipr-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
     #ipr-overlay .ipr-metric { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; }
     #ipr-overlay .ipr-metric span { display: block; font-size: 11px; text-transform: uppercase; color: #64748b; }
@@ -556,8 +573,8 @@ function printInPage(title, summaryRows, tableHeaders, tableRows) {
   window.print();
 }
 
-function openReportWindow(title, summaryRows, tableHeaders, tableRows) {
-  printInPage(title, summaryRows, tableHeaders, tableRows);
+function openReportWindow(reportType, subtitle, summaryRows, tableHeaders, tableRows) {
+  printInPage(reportType, subtitle, summaryRows, tableHeaders, tableRows);
 }
 
 function applyBootstrapData(data) {
@@ -2788,6 +2805,163 @@ function renderZaimDashboard() {
   `;
 }
 
+function getZaimRegistrationRows() {
+  const query = zaimRegistrationSearch.trim().toLowerCase();
+
+  return getCurrentHalqaMembers().filter((member) => {
+    const statusLabel = member.registered ? "Registered" : "Not Registered";
+    const matchesStatus = zaimRegistrationStatusFilter === "All" || zaimRegistrationStatusFilter === statusLabel;
+    const matchesQuery =
+      !query ||
+      String(member.code || "").toLowerCase().includes(query) ||
+      String(member.name || "").toLowerCase().includes(query);
+
+    return matchesStatus && matchesQuery;
+  });
+}
+
+function getZaimAttendanceRows() {
+  const query = zaimAttendanceSearch.trim().toLowerCase();
+
+  return getCurrentHalqaMembers().filter((member) => {
+    const statusLabel = isMemberPresent(member) ? "Present" : "Pending";
+    const matchesStatus = zaimAttendanceStatusFilter === "All" || zaimAttendanceStatusFilter === statusLabel;
+    const matchesQuery =
+      !query ||
+      String(member.code || "").toLowerCase().includes(query) ||
+      String(member.name || "").toLowerCase().includes(query);
+
+    return matchesStatus && matchesQuery;
+  });
+}
+
+function renderZaimRegistrationResultsHTML() {
+  const rows = getZaimRegistrationRows();
+  return `
+    <div class="detail-table zaim-detail-table" role="table" aria-label="Zaim registration details">
+      <div class="detail-row detail-head" role="row">
+        <span>Code</span>
+        <span>Name</span>
+        <span>Status</span>
+      </div>
+      ${rows.map((member) => `
+        <div class="detail-row" role="row">
+          <strong>${member.code}</strong>
+          <span>${member.name}</span>
+          <span class="pill ${member.registered ? "pill-success" : "pill-muted"}">
+            ${member.registered ? "Registered" : "Not registered"}
+          </span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderZaimAttendanceResultsHTML() {
+  const rows = getZaimAttendanceRows();
+  return `
+    <div class="detail-table zaim-detail-table" role="table" aria-label="Zaim attendance details">
+      <div class="detail-row detail-row-four detail-head" role="row">
+        <span>Code</span>
+        <span>Name</span>
+        <span>Attendance</span>
+        <span>Time</span>
+      </div>
+      ${rows.map((member) => `
+        <div class="detail-row detail-row-four" role="row">
+          <strong>${member.code}</strong>
+          <span>${member.name}</span>
+          <span class="pill ${isMemberPresent(member) ? "pill-success" : "pill-muted"}">
+            ${isMemberPresent(member) ? "Present" : "Pending"}
+          </span>
+          <span>${getMemberCheckIn(member) || "-"}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function getZaimRegistrationExportRows() {
+  return getZaimRegistrationRows().map((member) => [
+    member.code || "-",
+    member.name || "-",
+    member.registered ? "Registered" : "Not Registered",
+  ]);
+}
+
+function exportZaimRegistrationCsv() {
+  downloadCsv(
+    "zaim-registration-report.csv",
+    ["Code", "Name", "Status"],
+    getZaimRegistrationExportRows()
+  );
+}
+
+function openZaimRegistrationPdfReport() {
+  const filteredRows = getZaimRegistrationRows();
+  const registeredCount = filteredRows.filter((m) => m.registered).length;
+  const halqa = currentUser?.halqa || "";
+  const tajnid = getHalqaTajnid(halqa);
+  const filterDesc = [
+    zaimRegistrationStatusFilter !== "All" ? `Status: ${zaimRegistrationStatusFilter}` : "",
+    zaimRegistrationSearch ? `Search: "${zaimRegistrationSearch}"` : "",
+  ].filter(Boolean).join(" | ");
+
+  openReportWindow(
+    "Registration Report",
+    [`Halqa: ${halqa}`, filterDesc].filter(Boolean).join(" | "),
+    [
+      ["Tajnid", String(tajnid)],
+      ["Registered", String(registeredCount)],
+      ["Not Registered", String(Math.max(tajnid - registeredCount, 0))],
+      ["Registration Rate", tajnid ? `${Math.round((registeredCount / tajnid) * 100)}%` : "0%"],
+    ],
+    ["Code", "Name", "Status"],
+    getZaimRegistrationExportRows()
+  );
+}
+
+function getZaimAttendanceExportRows() {
+  return getZaimAttendanceRows().map((member) => [
+    member.code || "-",
+    member.name || "-",
+    isMemberPresent(member) ? "Present" : "Pending",
+    getMemberCheckIn(member) || "-",
+  ]);
+}
+
+function exportZaimAttendanceCsv() {
+  downloadCsv(
+    "zaim-attendance-report.csv",
+    ["Code", "Name", "Status", "Check-In Time"],
+    getZaimAttendanceExportRows()
+  );
+}
+
+function openZaimAttendancePdfReport() {
+  const filteredRows = getZaimAttendanceRows();
+  const presentCount = filteredRows.filter((m) => isMemberPresent(m)).length;
+  const halqa = currentUser?.halqa || "";
+  const tajnid = getHalqaTajnid(halqa);
+  const filterDesc = [
+    zaimAttendanceStatusFilter !== "All" ? `Status: ${zaimAttendanceStatusFilter}` : "",
+    zaimAttendanceSearch ? `Search: "${zaimAttendanceSearch}"` : "",
+  ].filter(Boolean).join(" | ");
+
+  openReportWindow(
+    "Attendance Report",
+    [`Halqa: ${halqa}`, filterDesc].filter(Boolean).join(" | "),
+    [
+      ["Tajnid", String(tajnid)],
+      ["Present", String(presentCount)],
+      ["Pending", String(Math.max(tajnid - presentCount, 0))],
+      ["Attendance Rate", tajnid ? `${Math.round((presentCount / tajnid) * 100)}%` : "0%"],
+    ],
+    ["Code", "Name", "Status", "Check-In Time"],
+    getZaimAttendanceExportRows()
+  );
+}
+
 function renderZaimRegistrationDetails() {
   const members = getCurrentHalqaMembers();
   const registeredMembers = members.filter((member) => member.registered);
@@ -2798,26 +2972,27 @@ function renderZaimRegistrationDetails() {
       ${renderMiniProgress("Registration Progress", stats.registrationRate, `${registeredMembers.length} / ${stats.tajnid} registered`)}
       ${renderZaimActionList(stats)}
     </section>
-    <div class="detail-table zaim-detail-table" role="table" aria-label="Zaim registration details">
-      <div class="detail-row detail-head" role="row">
-        <span>Code</span>
-        <span>Name</span>
-        <span>Status</span>
+    <section class="registration-toolbar-panel">
+      <div class="filter-bar">
+        <label class="search-field">
+          <span>Search member</span>
+          <input id="zaimRegistrationSearchInput" value="${escapeAttribute(zaimRegistrationSearch)}" placeholder="Name or code" />
+        </label>
+        <label class="search-field">
+          <span>Status</span>
+          <select id="zaimRegistrationStatusFilter">
+            ${["All", "Registered", "Not Registered"]
+              .map((s) => `<option ${zaimRegistrationStatusFilter === s ? "selected" : ""}>${s}</option>`)
+              .join("")}
+          </select>
+        </label>
       </div>
-      ${members
-        .map(
-          (member) => `
-            <div class="detail-row" role="row">
-              <strong>${member.code}</strong>
-              <span>${member.name}</span>
-              <span class="pill ${member.registered ? "pill-success" : "pill-muted"}">
-                ${member.registered ? "Registered" : "Not registered"}
-              </span>
-            </div>
-          `
-        )
-        .join("")}
-    </div>
+      <div class="registration-toolbar-actions">
+        <button class="secondary-button compact zaim-registration-pdf-button" type="button">PDF Report</button>
+        <button class="secondary-button compact zaim-registration-excel-button" type="button">Excel</button>
+      </div>
+    </section>
+    <div id="zaimRegistrationResultsContainer">${renderZaimRegistrationResultsHTML()}</div>
   `;
 }
 
@@ -2831,28 +3006,27 @@ function renderZaimAttendanceDetails() {
       ${renderMiniProgress("Attendance Progress", stats.attendanceRate, `${presentMembers.length} / ${stats.registered} present`)}
       ${renderZaimActionList(stats)}
     </section>
-    <div class="detail-table zaim-detail-table" role="table" aria-label="Zaim attendance details">
-      <div class="detail-row detail-row-four detail-head" role="row">
-        <span>Code</span>
-        <span>Name</span>
-        <span>Attendance</span>
-        <span>Time</span>
+    <section class="registration-toolbar-panel">
+      <div class="filter-bar">
+        <label class="search-field">
+          <span>Search member</span>
+          <input id="zaimAttendanceSearchInput" value="${escapeAttribute(zaimAttendanceSearch)}" placeholder="Name or code" />
+        </label>
+        <label class="search-field">
+          <span>Status</span>
+          <select id="zaimAttendanceStatusFilter">
+            ${["All", "Present", "Pending"]
+              .map((s) => `<option ${zaimAttendanceStatusFilter === s ? "selected" : ""}>${s}</option>`)
+              .join("")}
+          </select>
+        </label>
       </div>
-      ${members
-        .map(
-          (member) => `
-            <div class="detail-row detail-row-four" role="row">
-              <strong>${member.code}</strong>
-              <span>${member.name}</span>
-              <span class="pill ${isMemberPresent(member) ? "pill-success" : "pill-muted"}">
-                ${isMemberPresent(member) ? "Present" : "Pending"}
-              </span>
-              <span>${getMemberCheckIn(member) || "-"}</span>
-            </div>
-          `
-        )
-        .join("")}
-    </div>
+      <div class="registration-toolbar-actions">
+        <button class="secondary-button compact zaim-attendance-pdf-button" type="button">PDF Report</button>
+        <button class="secondary-button compact zaim-attendance-excel-button" type="button">Excel</button>
+      </div>
+    </section>
+    <div id="zaimAttendanceResultsContainer">${renderZaimAttendanceResultsHTML()}</div>
   `;
 }
 
@@ -3043,6 +3217,44 @@ function getCurrentCheckInTime() {
   });
 }
 
+const CHECKIN_TIMESTAMP_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function getCurrentCheckInTimestamp() {
+  const now = new Date();
+  const datePart = `${CHECKIN_TIMESTAMP_MONTHS[now.getMonth()]} ${now.getDate()}`;
+  const timePart = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return `${datePart}, ${timePart}`;
+}
+
+function parseCheckInTimestamp(text) {
+  const match = String(text || "").trim().match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, monthStr, dayStr, hourStr, minuteStr, meridiem] = match;
+  const monthIndex = CHECKIN_TIMESTAMP_MONTHS.findIndex((m) => m.toLowerCase() === monthStr.toLowerCase());
+
+  if (monthIndex === -1) {
+    return null;
+  }
+
+  let hours = Number(hourStr);
+  const minutes = Number(minuteStr);
+
+  if (meridiem.toUpperCase() === "PM" && hours !== 12) {
+    hours += 12;
+  }
+
+  if (meridiem.toUpperCase() === "AM" && hours === 12) {
+    hours = 0;
+  }
+
+  const now = new Date();
+  return new Date(now.getFullYear(), monthIndex, Number(dayStr), hours, minutes, 0, 0);
+}
+
 async function checkInMember(code, manualMember = null) {
   const normalizedCode = normalizeAttendanceCode(code || manualMember?.code);
   let member = memberRecords.find((record) => normalizeAttendanceCode(record.code) === normalizedCode);
@@ -3100,7 +3312,7 @@ async function checkInMember(code, manualMember = null) {
     }
   }
 
-  const checkIn = getCurrentCheckInTime();
+  const checkIn = getCurrentCheckInTimestamp();
   member.attended = true;
   member.checkIn = checkIn;
 
@@ -3159,7 +3371,7 @@ async function confirmAttendanceModalCheckIn() {
   attendanceModal = {
     type: "success",
     code: refreshedMember.code,
-    checkIn: refreshedMember.checkIn || getCurrentCheckInTime(),
+    checkIn: refreshedMember.checkIn || getCurrentCheckInTimestamp(),
   };
   attendanceSearch = "";
   renderDashboard(currentRole);
@@ -3837,28 +4049,30 @@ function getAttendanceTrendRows() {
     .filter((member) => isMemberPresent(member))
     .forEach((member) => {
       const attendanceRecord = getAttendanceRecordForMember(member.code) || {};
-      const parsedTime = parseTodayTime(getMemberCheckIn(member) || attendanceRecord.checkIn);
+      const checkInText = getMemberCheckIn(member) || attendanceRecord.checkIn;
+      const parsedTime = parseCheckInTimestamp(checkInText) || parseTodayTime(checkInText);
 
       if (!parsedTime) {
         return;
       }
 
-      const label = parsedTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }).replace(/:\d{2}\s/, " ");
-      buckets.set(label, (buckets.get(label) || 0) + 1);
+      const dateLabel = `${CHECKIN_TIMESTAMP_MONTHS[parsedTime.getMonth()]} ${parsedTime.getDate()}`;
+      const hourLabel = parsedTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }).replace(/:\d{2}\s/, " ");
+      const label = `${dateLabel}, ${hourLabel}`;
+      const sortKey = new Date(parsedTime.getFullYear(), parsedTime.getMonth(), parsedTime.getDate(), parsedTime.getHours()).getTime();
+      const existing = buckets.get(label);
+      buckets.set(label, { count: (existing?.count || 0) + 1, sortKey });
     });
 
   const rows = [...buckets.entries()]
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => {
-      const aDate = parseTodayTime(a.label.replace(/\s/, ":00 "));
-      const bDate = parseTodayTime(b.label.replace(/\s/, ":00 "));
-      return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
-    });
+    .map(([label, { count, sortKey }]) => ({ label, count, sortKey }))
+    .sort((a, b) => a.sortKey - b.sortKey);
 
   const max = Math.max(...rows.map((row) => row.count), 1);
 
   return rows.map((row) => ({
-    ...row,
+    label: row.label,
+    count: row.count,
     width: Math.max(8, Math.round((row.count / max) * 100)),
   }));
 }
@@ -3928,7 +4142,7 @@ function exportRegistrationCsv(summaryOnly = false) {
 function openRegistrationPdfReport() {
   const filteredRows = getRegistrationRows();
   const presentCount = filteredRows.filter((m) => isMemberPresent(m)).length;
-  const pendingCount = filteredRows.length - presentCount;
+  const tajnid = registrationHalqaFilter !== "All" ? getHalqaTajnid(registrationHalqaFilter) : getTotalTajnid();
   const filterDesc = [
     registrationHalqaFilter !== "All" ? `Halqa: ${registrationHalqaFilter}` : "",
     registrationStatusFilter !== "All" ? `Status: ${registrationStatusFilter}` : "",
@@ -3936,12 +4150,13 @@ function openRegistrationPdfReport() {
   ].filter(Boolean).join(" | ") || "All Members";
 
   openReportWindow(
-    `IJTEMA Registration Report — ${filterDesc}`,
+    "Registration Report",
+    filterDesc,
     [
-      ["Total Shown", String(filteredRows.length)],
+      ["Tajnid", String(tajnid)],
       ["Present", String(presentCount)],
-      ["Pending", String(pendingCount)],
-      ["Attendance Rate", filteredRows.length ? `${Math.round((presentCount / filteredRows.length) * 100)}%` : "0%"],
+      ["Pending", String(Math.max(tajnid - presentCount, 0))],
+      ["Attendance Rate", tajnid ? `${Math.round((presentCount / tajnid) * 100)}%` : "0%"],
     ],
     ["Code", "Name", "Halqa", "Registered", "Check-In", "Status"],
     getRegistrationExportRows()
@@ -3976,6 +4191,7 @@ function exportAttendanceCsv() {
 function openAttendancePdfReport() {
   const filteredRows = getAttendanceReportRows();
   const presentCount = filteredRows.filter((m) => isMemberPresent(m)).length;
+  const tajnid = attendanceReportHalqaFilter !== "All" ? getHalqaTajnid(attendanceReportHalqaFilter) : getTotalTajnid();
   const filterDesc = [
     attendanceReportHalqaFilter !== "All" ? `Halqa: ${attendanceReportHalqaFilter}` : "",
     attendanceReportStatusFilter !== "All" ? `Status: ${attendanceReportStatusFilter}` : "",
@@ -3983,12 +4199,13 @@ function openAttendancePdfReport() {
   ].filter(Boolean).join(" | ") || "All Members";
 
   openReportWindow(
-    `IJTEMA Attendance Report — ${filterDesc}`,
+    "Attendance Report",
+    filterDesc,
     [
-      ["Total Shown", String(filteredRows.length)],
+      ["Tajnid", String(tajnid)],
       ["Present", String(presentCount)],
-      ["Pending", String(filteredRows.length - presentCount)],
-      ["Attendance Rate", filteredRows.length ? `${Math.round((presentCount / filteredRows.length) * 100)}%` : "0%"],
+      ["Pending", String(Math.max(tajnid - presentCount, 0))],
+      ["Attendance Rate", tajnid ? `${Math.round((presentCount / tajnid) * 100)}%` : "0%"],
     ],
     ["Code", "Name", "Halqa", "Status", "Check-In Time", "Checked In By"],
     getAttendanceExportRows()
@@ -4622,8 +4839,13 @@ function renderFinalPositionsManager(categoryFilter) {
       </div>
       <div id="fpPrintArea">
         <div class="fp-print-header">
-          <h2>Final Positions Report</h2>
-          <p>Majlis Muqami MKAC Ijtima${categoryFilter ? " — " + categoryFilter : ""}</p>
+          <img class="fp-print-logo" src="/logo.png" alt="Majlis Muqami MKAC Ijtima" />
+          <div class="fp-print-header-center">
+            <h2>Majlis Muqami MKAC Ijtima</h2>
+            <p class="fp-print-type">Final Positions Report</p>
+            ${categoryFilter ? `<p class="fp-print-subtitle">${escapeHtml(categoryFilter)}</p>` : ""}
+          </div>
+          <div class="fp-print-header-spacer"></div>
         </div>
         ${viewCards}
       </div>
@@ -4685,7 +4907,8 @@ function openFinalsPdfReport() {
   const compCount = new Set(entries.map((e) => e.competition)).size;
 
   openReportWindow(
-    `Competition Final Positions${filterParts.length ? " — " + filterParts.join(" | ") : ""}`,
+    "Final Positions Report",
+    filterParts.join(" | "),
     [
       ["Competitions", String(compCount)],
       ["Total Entries", String(tableRows.length)],
@@ -6604,7 +6827,7 @@ function bindDynamicControls() {
         memberRecords.find((member) => normalizeAttendanceCode(member.code) === normalizeAttendanceCode(manualMember.code)) ||
         memberRecords.find((member) => member.name === manualMember.name && member.halqa === manualMember.halqa);
       attendanceModal = checkedInMember
-        ? { type: "success", code: checkedInMember.code, checkIn: checkedInMember.checkIn || getCurrentCheckInTime() }
+        ? { type: "success", code: checkedInMember.code, checkIn: checkedInMember.checkIn || getCurrentCheckInTimestamp() }
         : null;
       attendanceSearch = "";
       renderDashboard(currentRole);
@@ -6684,6 +6907,62 @@ function bindDynamicControls() {
     if (!container) return;
     container.innerHTML = renderAdminUserTableHTML();
   }
+
+  function updateZaimRegistrationResults() {
+    const container = document.querySelector("#zaimRegistrationResultsContainer");
+    if (!container) return;
+    container.innerHTML = renderZaimRegistrationResultsHTML();
+  }
+
+  function updateZaimAttendanceResults() {
+    const container = document.querySelector("#zaimAttendanceResultsContainer");
+    if (!container) return;
+    container.innerHTML = renderZaimAttendanceResultsHTML();
+  }
+
+  const zaimRegistrationSearchInput = document.querySelector("#zaimRegistrationSearchInput");
+
+  if (zaimRegistrationSearchInput) {
+    zaimRegistrationSearchInput.addEventListener("input", (event) => {
+      zaimRegistrationSearch = event.target.value;
+      updateZaimRegistrationResults();
+    });
+  }
+
+  document.querySelector("#zaimRegistrationStatusFilter")?.addEventListener("change", (event) => {
+    zaimRegistrationStatusFilter = event.target.value;
+    updateZaimRegistrationResults();
+  });
+
+  document.querySelector(".zaim-registration-pdf-button")?.addEventListener("click", () => {
+    openZaimRegistrationPdfReport();
+  });
+
+  document.querySelector(".zaim-registration-excel-button")?.addEventListener("click", () => {
+    exportZaimRegistrationCsv();
+  });
+
+  const zaimAttendanceSearchInput = document.querySelector("#zaimAttendanceSearchInput");
+
+  if (zaimAttendanceSearchInput) {
+    zaimAttendanceSearchInput.addEventListener("input", (event) => {
+      zaimAttendanceSearch = event.target.value;
+      updateZaimAttendanceResults();
+    });
+  }
+
+  document.querySelector("#zaimAttendanceStatusFilter")?.addEventListener("change", (event) => {
+    zaimAttendanceStatusFilter = event.target.value;
+    updateZaimAttendanceResults();
+  });
+
+  document.querySelector(".zaim-attendance-pdf-button")?.addEventListener("click", () => {
+    openZaimAttendancePdfReport();
+  });
+
+  document.querySelector(".zaim-attendance-excel-button")?.addEventListener("click", () => {
+    exportZaimAttendanceCsv();
+  });
 
   const registrationSearchInput = document.querySelector("#registrationSearchInput");
 
@@ -6786,11 +7065,17 @@ function bindDynamicControls() {
   document.querySelector("#fpPrintBtn")?.addEventListener("click", () => {
     const area = document.querySelector("#fpPrintArea");
     if (!area) return;
+    const printHtml = area.innerHTML.replace('src="/logo.png"', `src="${location.origin}/logo.png"`);
     const win = window.open("", "_blank");
     win.document.write(`<!DOCTYPE html><html><head><title>Final Positions Report</title><style>
       body { font-family: Arial, sans-serif; margin: 32px; color: #111; }
-      h2 { margin: 0 0 4px; font-size: 22px; }
-      p { margin: 0 0 24px; color: #555; font-size: 14px; }
+      h2 { margin: 0; font-size: 22px; }
+      p { margin: 0; color: #555; font-size: 14px; }
+      .fp-print-header { display: grid; grid-template-columns: 70px 1fr 70px; align-items: center; gap: 12px; margin-bottom: 24px; }
+      .fp-print-logo { height: 56px; width: auto; justify-self: start; }
+      .fp-print-header-center { text-align: center; }
+      .fp-print-type { margin-top: 4px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #0f766e; }
+      .fp-print-subtitle { margin-top: 2px; font-size: 13px; color: #555; }
       .fp-view-card { border: 1px solid #ddd; border-radius: 8px; margin-bottom: 16px; page-break-inside: avoid; }
       .fp-view-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f5f5f5; border-bottom: 1px solid #ddd; font-weight: 700; font-size: 15px; }
       .pill { background: #e0f2f1; color: #0f766e; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
@@ -6800,7 +7085,7 @@ function bindDynamicControls() {
       em { color: #888; font-style: normal; font-size: 13px; }
       .fp-view-empty { padding: 10px 14px; color: #999; font-size: 13px; }
       @media print { body { margin: 16px; } }
-    </style></head><body>${area.innerHTML}</body></html>`);
+    </style></head><body>${printHtml}</body></html>`);
     win.document.close();
     win.focus();
     setTimeout(() => { win.print(); }, 400);

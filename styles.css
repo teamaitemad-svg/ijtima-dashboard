@@ -4235,6 +4235,15 @@ a.wide-soft-action {
   padding: 16px;
 }
 
+.dashboard-grid > .registration-toolbar-panel {
+  grid-column: 1 / -1;
+}
+
+#zaimRegistrationResultsContainer,
+#zaimAttendanceResultsContainer {
+  display: contents;
+}
+
 .registration-filter-bar {
   grid-template-columns: minmax(220px, 1fr) minmax(180px, 260px) minmax(160px, 220px);
   margin-top: 0;
@@ -6929,6 +6938,44 @@ a.wide-soft-action {
 }
 
 /* View tab */
+.fp-print-header {
+  display: grid;
+  grid-template-columns: 70px 1fr 70px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.fp-print-logo {
+  height: 56px;
+  width: auto;
+  justify-self: start;
+}
+
+.fp-print-header-center {
+  text-align: center;
+}
+
+.fp-print-header-center h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.fp-print-type {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #0f766e;
+}
+
+.fp-print-subtitle {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
 .fp-view-body {
   gap: 12px;
 }
