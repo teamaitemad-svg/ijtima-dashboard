@@ -976,12 +976,27 @@ async function handleApi(request, response, url) {
   const DOCUMENTS_FILE = path.join(PUBLIC_DIR, "documents.json");
   const ALLOWED_DOCUMENT_KEYS = ["syllabus", "sports-package"];
 
+  const DEFAULT_DOCUMENTS = {
+    syllabus: {
+      url: "https://drive.google.com/file/d/1m-pGHin05ScQ32-cJ-WWmtDvsbs_dWbM/view",
+      label: "",
+      updatedAt: 1781548185624,
+    },
+    "sports-package": {
+      url: "https://drive.google.com/file/d/1XGE3cQ4etF7KqvGbaMfZE7bbo7zKji7R/view?usp=sharing",
+      label: "",
+      updatedAt: 1781731200000,
+    },
+  };
+
   function readDocumentsFile() {
+    let stored = {};
     try {
-      return JSON.parse(fs.readFileSync(DOCUMENTS_FILE, "utf8"));
+      stored = JSON.parse(fs.readFileSync(DOCUMENTS_FILE, "utf8"));
     } catch {
-      return {};
+      stored = {};
     }
+    return { ...DEFAULT_DOCUMENTS, ...stored };
   }
 
   function writeDocumentsFile(data) {
@@ -989,7 +1004,7 @@ async function handleApi(request, response, url) {
   }
 
   if (request.method === "GET" && requestPath === "/api/documents") {
-    const stored = (await readDocuments()) || readDocumentsFile();
+    const stored = { ...readDocumentsFile(), ...((await readDocuments()) || {}) };
     const docs = ALLOWED_DOCUMENT_KEYS.map((key) => {
       const entry = stored[key];
       return entry ? { key, uploaded: true, url: entry.url, label: entry.label, updatedAt: entry.updatedAt } : { key, uploaded: false };
