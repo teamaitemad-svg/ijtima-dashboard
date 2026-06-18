@@ -511,11 +511,9 @@ function printInPage(reportType, subtitle, summaryRows, tableHeaders, tableRows)
     .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(String(cell))}</td>`).join("")}</tr>`)
     .join("");
 
-  const overlay = document.createElement("div");
-  overlay.id = "ipr-overlay";
-  overlay.innerHTML = `
+  const bodyHtml = `
     <div class="ipr-header">
-      <img class="ipr-logo" src="/logo.png" alt="Majlis Muqami MKAC Ijtima" />
+      <img class="ipr-logo" src="${location.origin}/logo.png" alt="Majlis Muqami MKAC Ijtima" />
       <div class="ipr-header-center">
         <h1>Majlis Muqami MKAC Ijtima</h1>
         <p class="ipr-report-type">${escapeHtml(reportType)}</p>
@@ -531,46 +529,34 @@ function printInPage(reportType, subtitle, summaryRows, tableHeaders, tableRows)
     </table>
   `;
 
-  const style = document.createElement("style");
-  style.id = "ipr-style";
-  style.textContent = `
-    #ipr-overlay {
-      display: none;
-      font-family: Arial, sans-serif;
-      color: #0f172a;
-      padding: 24px;
-    }
-    #ipr-overlay .ipr-header { display: grid; grid-template-columns: 90px 1fr 90px; align-items: center; gap: 12px; }
-    #ipr-overlay .ipr-logo { height: 60px; width: auto; justify-self: start; }
-    #ipr-overlay .ipr-header-center { text-align: center; }
-    #ipr-overlay .ipr-header-center h1 { margin: 0; font-size: 20px; }
-    #ipr-overlay .ipr-report-type { margin: 4px 0 0; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #0f766e; }
-    #ipr-overlay .ipr-subtitle { margin: 2px 0 0; font-size: 12px; color: #475569; }
-    #ipr-overlay .ipr-meta { margin: 10px 0 16px; color: #64748b; font-size: 12px; text-align: center; }
-    #ipr-overlay .ipr-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
-    #ipr-overlay .ipr-metric { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; }
-    #ipr-overlay .ipr-metric span { display: block; font-size: 11px; text-transform: uppercase; color: #64748b; }
-    #ipr-overlay .ipr-metric strong { display: block; font-size: 20px; margin-top: 4px; }
-    #ipr-overlay table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    #ipr-overlay th, #ipr-overlay td { padding: 7px 8px; border: 1px solid #cbd5e1; text-align: left; }
-    #ipr-overlay th { background: #f1f5f9; text-transform: uppercase; font-size: 11px; font-weight: 700; }
-    @media print {
-      body > *:not(#ipr-overlay) { display: none !important; }
-      #ipr-overlay { display: block !important; }
-    }
-  `;
+  const win = window.open("", "_blank");
 
-  document.head.appendChild(style);
-  document.body.appendChild(overlay);
+  if (!win) {
+    alert("Please allow pop-ups for this site to view the PDF report.");
+    return;
+  }
 
-  const cleanup = () => {
-    style.remove();
-    overlay.remove();
-    window.removeEventListener("afterprint", cleanup);
-  };
-  window.addEventListener("afterprint", cleanup);
-
-  window.print();
+  win.document.write(`<!DOCTYPE html><html><head><title>${escapeHtml(reportType)}</title><style>
+    body { font-family: Arial, sans-serif; color: #0f172a; padding: 24px; margin: 0; }
+    .ipr-header { display: grid; grid-template-columns: 90px 1fr 90px; align-items: center; gap: 12px; }
+    .ipr-logo { height: 60px; width: auto; justify-self: start; }
+    .ipr-header-center { text-align: center; }
+    .ipr-header-center h1 { margin: 0; font-size: 20px; }
+    .ipr-report-type { margin: 4px 0 0; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #0f766e; }
+    .ipr-subtitle { margin: 2px 0 0; font-size: 12px; color: #475569; }
+    .ipr-meta { margin: 10px 0 16px; color: #64748b; font-size: 12px; text-align: center; }
+    .ipr-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+    .ipr-metric { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    .ipr-metric span { display: block; font-size: 11px; text-transform: uppercase; color: #64748b; }
+    .ipr-metric strong { display: block; font-size: 20px; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 7px 8px; border: 1px solid #cbd5e1; text-align: left; }
+    th { background: #f1f5f9; text-transform: uppercase; font-size: 11px; font-weight: 700; }
+    @media print { body { margin: 16px; } }
+  </style></head><body>${bodyHtml}</body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 400);
 }
 
 function openReportWindow(reportType, subtitle, summaryRows, tableHeaders, tableRows) {
