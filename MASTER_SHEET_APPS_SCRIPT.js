@@ -347,7 +347,9 @@ function rowsToObjects(values) {
 
 function formatCellValue(value) {
   if (value instanceof Date) {
-    return Utilities.formatDate(value, Session.getScriptTimeZone(), "hh:mm a");
+    // Sheets anchors time-only values to Dec 30, 1899; real calendar dates land on any other day.
+    const isTimeOnly = value.getFullYear() === 1899 && value.getMonth() === 11 && value.getDate() === 30;
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), isTimeOnly ? "hh:mm a" : "yyyy-MM-dd");
   }
 
   return value;
