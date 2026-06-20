@@ -36,7 +36,7 @@ function setupMasterDashboardSheet() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 
   setupTab(spreadsheet, "Users", ["username", "password", "name", "role", "halqa", "access"]);
-  setupTab(spreadsheet, "Schedule", ["start", "end", "title", "location", "lead", "status"]);
+  setupTab(spreadsheet, "Schedule", ["date", "start", "end", "title", "location", "lead", "status"]);
   setupTab(spreadsheet, "Announcements", ["title", "message", "time", "priority"]);
   setupTab(spreadsheet, "Master Members", ["code", "name", "halqa", "phone"]);
   setupTab(spreadsheet, "Members", ["code", "name", "halqa", "registered", "attended", "checkIn"]);
@@ -93,10 +93,10 @@ function seedUsers(spreadsheet) {
 function seedSchedule(spreadsheet) {
   const sheet = spreadsheet.getSheetByName("Schedule");
   const rows = [
-    ["09:00 AM", "09:30 AM", "Opening Session", "Main Hall", "Ijtima Nazim", "Completed"],
-    ["09:30 AM", "10:15 AM", "Tilawat & Nazm", "Main Hall", "Education Team", "Live"],
-    ["10:20 AM", "11:15 AM", "Educational Competitions", "Classroom Block", "Taleem Department", "Next"],
-    ["10:30 AM", "12:00 PM", "Sports Round 1", "Sports Ground", "Sports Team", "Upcoming"],
+    ["2026-06-19", "09:00 AM", "09:30 AM", "Opening Session", "Main Hall", "Ijtima Nazim", "Completed"],
+    ["2026-06-19", "09:30 AM", "10:15 AM", "Tilawat & Nazm", "Main Hall", "Education Team", "Live"],
+    ["2026-06-19", "10:20 AM", "11:15 AM", "Educational Competitions", "Classroom Block", "Taleem Department", "Next"],
+    ["2026-06-19", "10:30 AM", "12:00 PM", "Sports Round 1", "Sports Ground", "Sports Team", "Upcoming"],
   ];
 
   sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
@@ -526,7 +526,7 @@ function markAttendanceAbsent(payload) {
 
 function addScheduleItem(payload) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Schedule");
-  sheet.appendRow([payload.start, payload.end, payload.title, payload.location, payload.lead, payload.status || "Upcoming"]);
+  sheet.appendRow([payload.date, payload.start, payload.end, payload.title, payload.location, payload.lead, payload.status || "Upcoming"]);
   return { scheduleItems: rowsToObjects(sheet.getDataRange().getValues()) };
 }
 
@@ -535,8 +535,8 @@ function updateScheduleItem(payload) {
   const rowNumber = Number(payload.rowId);
 
   if (rowNumber >= 2) {
-    sheet.getRange(rowNumber, 1, 1, 6).setValues([
-      [payload.start, payload.end, payload.title, payload.location, payload.lead, payload.status || "Upcoming"],
+    sheet.getRange(rowNumber, 1, 1, 7).setValues([
+      [payload.date, payload.start, payload.end, payload.title, payload.location, payload.lead, payload.status || "Upcoming"],
     ]);
   }
 

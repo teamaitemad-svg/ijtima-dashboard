@@ -18,6 +18,13 @@ Code | Name | Halqa | Registered | Attended | Check In
 ```
 
 If someone attends but is not in `Master Members`, the attendance screen can add them manually as a walk-in during check-in.
+
+The `Schedule` tab should use these columns:
+
+```text
+date | start | end | title | location | lead | status
+```
+
 3. Open `Extensions > Apps Script`.
 4. Paste the contents of `MASTER_SHEET_APPS_SCRIPT.js`.
 5. Replace these constants at the top:

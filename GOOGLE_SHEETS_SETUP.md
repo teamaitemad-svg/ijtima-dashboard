@@ -11,7 +11,7 @@ username | password | name | role | halqa | access
 
 ### Schedule
 ```text
-start | end | title | location | lead | status
+date | start | end | title | location | lead | status
 ```
 
 ### Announcements
