@@ -42,6 +42,7 @@ function setupMasterDashboardSheet() {
   setupTab(spreadsheet, "Members", ["code", "name", "halqa", "registered", "attended", "checkIn"]);
   setupTab(spreadsheet, "Attendance", ["code", "name", "halqa", "checkIn", "checkedInBy"]);
   setupTab(spreadsheet, "Competition Results", ["category", "competition", "position", "name", "halqa", "points"]);
+  setupTab(spreadsheet, "Competitions", ["id", "name", "category", "type"]);
   setupTab(spreadsheet, "Halqa Rankings", ["halqa", "attendance", "education", "sports", "total", "rank"]);
   setupTab(spreadsheet, "Education Competition Rosters", ["competition", "name", "code", "halqa"]);
   setupTab(spreadsheet, "Sports Competition Rosters", ["sport", "position", "name", "code", "halqa"]);
@@ -280,6 +281,18 @@ function doPost(e) {
     return jsonResponse(removeSportsRosterParticipant(body.payload));
   }
 
+  if (action === "addCompetition") {
+    return jsonResponse(addCompetition(body.payload));
+  }
+
+  if (action === "deleteCompetition") {
+    return jsonResponse(deleteCompetition(body.payload));
+  }
+
+  if (action === "saveCompetitionFinals") {
+    return jsonResponse(saveCompetitionFinals(body.payload));
+  }
+
   return jsonResponse({ error: "Unknown action." });
 }
 
@@ -291,6 +304,7 @@ function getBootstrapPayload() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const masterMembers = normalizeMasterMembers(rowsToObjects(spreadsheet.getSheetByName("Master Members").getDataRange().getValues()));
   const registrations = normalizeMembers(rowsToObjects(spreadsheet.getSheetByName("Members").getDataRange().getValues()));
+  const attendanceRows = rowsToObjects(spreadsheet.getSheetByName("Attendance").getDataRange().getValues());
 
   return {
     halqajat: HALQAJAT,
@@ -299,9 +313,10 @@ function getBootstrapPayload() {
     announcements: rowsToObjects(spreadsheet.getSheetByName("Announcements").getDataRange().getValues()),
     masterMemberRecords: masterMembers,
     registrationRecords: registrations,
-    memberRecords: mergeMasterAndRegistrations(masterMembers, registrations),
-    attendanceRecords: rowsToObjects(spreadsheet.getSheetByName("Attendance").getDataRange().getValues()),
+    memberRecords: mergeAttendance(mergeMasterAndRegistrations(masterMembers, registrations), attendanceRows),
+    attendanceRecords: attendanceRows,
     competitionResults: rowsToObjects(spreadsheet.getSheetByName("Competition Results").getDataRange().getValues()),
+    competitionsList: getOptionalRows(spreadsheet, "Competitions"),
     halqaRankings: normalizeRankings(rowsToObjects(spreadsheet.getSheetByName("Halqa Rankings").getDataRange().getValues())),
     educationJudgeResults: getOptionalRows(spreadsheet, "Education Judge Results"),
     educationCompetitionRosters: getEducationCompetitionRosters(spreadsheet),
@@ -323,11 +338,19 @@ function rowsToObjects(values) {
     .map((row, index) => {
       const item = {};
       headers.forEach((header, index) => {
-        item[header] = row[index];
+        item[header] = formatCellValue(row[index]);
       });
       item._rowNumber = index + 2;
       return item;
     });
+}
+
+function formatCellValue(value) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "hh:mm a");
+  }
+
+  return value;
 }
 
 function getOptionalRows(spreadsheet, sheetName) {
@@ -383,6 +406,28 @@ function mergeMasterAndRegistrations(masterMembers, registrations) {
   });
 
   return merged;
+}
+
+function mergeAttendance(members, attendanceRows) {
+  const attendanceByCode = {};
+
+  (attendanceRows || []).forEach((row) => {
+    const code = String(row.code || "").trim();
+
+    if (code && !attendanceByCode[code]) {
+      attendanceByCode[code] = row;
+    }
+  });
+
+  return members.map((member) => {
+    const attendance = attendanceByCode[String(member.code || "").trim()];
+
+    if (!attendance) {
+      return member;
+    }
+
+    return { ...member, attended: true, checkIn: attendance.checkIn || member.checkIn || "" };
+  });
 }
 
 function normalizeRankings(rows) {
@@ -789,6 +834,102 @@ function upsertSportsResult(payload) {
     payload.postedAt,
   ]);
   return { sportsPostedResults: rowsToObjects(sheet.getDataRange().getValues()) };
+}
+
+function addCompetition(payload) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureTab(spreadsheet, "Competitions", ["id", "name", "category", "type"]);
+  sheet.appendRow([payload.id, payload.name, payload.category || "Education", payload.type || "Individual"]);
+  return { competitionsList: rowsToObjects(sheet.getDataRange().getValues()) };
+}
+
+function deleteCompetition(payload) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureTab(spreadsheet, "Competitions", ["id", "name", "category", "type"]);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+  const idIndex = headers.indexOf("id");
+  const nameIndex = headers.indexOf("name");
+  const id = String(payload.id || "");
+  let competitionName = "";
+
+  for (let index = values.length - 1; index >= 1; index -= 1) {
+    if (String(values[index][idIndex]) === id) {
+      competitionName = String(values[index][nameIndex] || "");
+      sheet.deleteRow(index + 1);
+    }
+  }
+
+  const resultsSheet = ensureTab(spreadsheet, "Competition Results", ["category", "competition", "position", "name", "halqa", "points"]);
+
+  if (competitionName) {
+    const resultsValues = resultsSheet.getDataRange().getValues();
+    const resultsHeaders = resultsValues[0];
+    const competitionIndex = resultsHeaders.indexOf("competition");
+
+    for (let index = resultsValues.length - 1; index >= 1; index -= 1) {
+      if (String(resultsValues[index][competitionIndex]) === competitionName) {
+        resultsSheet.deleteRow(index + 1);
+      }
+    }
+  }
+
+  return {
+    competitionsList: rowsToObjects(sheet.getDataRange().getValues()),
+    competitionResults: rowsToObjects(resultsSheet.getDataRange().getValues()),
+  };
+}
+
+function saveCompetitionFinals(payload) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureTab(spreadsheet, "Competition Results", ["category", "competition", "position", "name", "halqa", "points"]);
+  const competition = String(payload.competition || "");
+  const category = payload.category || "Education";
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+  const competitionIndex = headers.indexOf("competition");
+
+  for (let index = values.length - 1; index >= 1; index -= 1) {
+    if (String(values[index][competitionIndex]) === competition) {
+      sheet.deleteRow(index + 1);
+    }
+  }
+
+  const rows = [];
+
+  (payload.slots || []).forEach((slot) => {
+    const halqaGroups = {};
+
+    (slot.members || []).forEach((member) => {
+      const halqa = String(member.halqa || "").trim();
+
+      if (!halqa) {
+        return;
+      }
+
+      if (!halqaGroups[halqa]) {
+        halqaGroups[halqa] = [];
+      }
+
+      const name = String(member.name || "").trim();
+
+      if (name) {
+        halqaGroups[halqa].push(name);
+      }
+    });
+
+    // One row per halqa represented in the slot, not per team member, so a halqa's
+    // SUMIFS total isn't inflated when several members of the same team share a halqa.
+    Object.keys(halqaGroups).forEach((halqa) => {
+      rows.push([category, competition, slot.rank, halqaGroups[halqa].join(", "), halqa, Number(slot.points) || 0]);
+    });
+  });
+
+  if (rows.length) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  }
+
+  return { competitionResults: rowsToObjects(sheet.getDataRange().getValues()) };
 }
 
 function ensureTab(spreadsheet, sheetName, headers) {

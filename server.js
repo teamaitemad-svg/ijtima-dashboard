@@ -129,6 +129,22 @@ const sportsPostedResults = [];
 let competitionsList = [];
 let competitionFinals = [];
 
+const POSITION_POINTS = { "1st": 10, "2nd": 7, "3rd": 5, Participation: 1 };
+
+function getPositionRank(position) {
+  const normalized = String(position || "").toLowerCase();
+
+  if (normalized.includes("1")) return 1;
+  if (normalized.includes("2")) return 2;
+  if (normalized.includes("3")) return 3;
+
+  return 99;
+}
+
+function getPointsForRank(rank) {
+  return POSITION_POINTS[rank] || Math.max(0, 11 - getPositionRank(rank));
+}
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, { "Content-Type": "application/json" });
   response.end(JSON.stringify(payload));
@@ -885,6 +901,14 @@ async function handleApi(request, response, url) {
       category: String(body.category || "Education").trim(),
       type: String(body.type || "Individual").trim(),
     };
+
+    if (isAppsScriptConfigured()) {
+      const data = await appsScriptRequest("addCompetition", competition);
+      invalidateBootstrapCache();
+      sendJson(response, 200, { competitionsList: data.competitionsList || [competition], addedId: id });
+      return true;
+    }
+
     competitionsList.push(competition);
     sendJson(response, 200, { competitionsList, addedId: id });
     return true;
@@ -893,6 +917,17 @@ async function handleApi(request, response, url) {
   if (request.method === "POST" && requestPath === "/api/competitions/delete") {
     const body = await readJson(request);
     const id = String(body.id || "").trim();
+
+    if (isAppsScriptConfigured()) {
+      const data = await appsScriptRequest("deleteCompetition", { id });
+      invalidateBootstrapCache();
+      const kept = competitionFinals.filter((f) => f.competitionId !== id);
+      competitionFinals.length = 0;
+      kept.forEach((f) => competitionFinals.push(f));
+      sendJson(response, 200, { competitionsList: data.competitionsList || [], competitionFinals });
+      return true;
+    }
+
     const idx = competitionsList.findIndex((c) => c.id === id);
     if (idx >= 0) competitionsList.splice(idx, 1);
     const kept = competitionFinals.filter((f) => f.competitionId !== id);
@@ -909,27 +944,45 @@ async function handleApi(request, response, url) {
       sendError(response, 400, "Competition ID is required.");
       return true;
     }
-    const comp = competitionsList.find((c) => c.id === competitionId);
+
+    const liveCompetitionsList = isAppsScriptConfigured()
+      ? (await bootstrapPayload()).competitionsList || competitionsList
+      : competitionsList;
+    const comp = liveCompetitionsList.find((c) => c.id === competitionId);
     const slots = Array.isArray(body.slots) ? body.slots : [];
+    const preparedSlots = slots
+      .map((slot) => ({
+        rank: String(slot.rank || "1st").trim(),
+        points: getPointsForRank(slot.rank),
+        members: (Array.isArray(slot.members) ? slot.members : [])
+          .filter((m) => String(m.name || "").trim() || String(m.code || "").trim())
+          .map((m) => ({
+            code: String(m.code || "").trim(),
+            name: String(m.name || "").trim(),
+            halqa: String(m.halqa || "").trim(),
+          })),
+      }))
+      .filter((slot) => slot.members.length);
+
+    if (isAppsScriptConfigured()) {
+      await appsScriptRequest("saveCompetitionFinals", {
+        competition: comp ? comp.name : competitionId,
+        category: comp ? comp.category : "Education",
+        slots: preparedSlots,
+      });
+      invalidateBootstrapCache();
+    }
+
     const kept = competitionFinals.filter((f) => f.competitionId !== competitionId);
-    slots.forEach((slot, slotIdx) => {
-      const members = (Array.isArray(slot.members) ? slot.members : [])
-        .filter((m) => String(m.name || "").trim() || String(m.code || "").trim())
-        .map((m) => ({
-          code: String(m.code || "").trim(),
-          name: String(m.name || "").trim(),
-          halqa: String(m.halqa || "").trim(),
-        }));
-      if (members.length) {
-        kept.push({
-          id: `f${competitionId}-${slotIdx}-${Date.now().toString(36)}`,
-          competitionId,
-          competition: comp ? comp.name : competitionId,
-          category: comp ? comp.category : "Education",
-          rank: String(slot.rank || "1st").trim(),
-          members,
-        });
-      }
+    preparedSlots.forEach((slot, slotIdx) => {
+      kept.push({
+        id: `f${competitionId}-${slotIdx}-${Date.now().toString(36)}`,
+        competitionId,
+        competition: comp ? comp.name : competitionId,
+        category: comp ? comp.category : "Education",
+        rank: slot.rank,
+        members: slot.members,
+      });
     });
     competitionFinals.length = 0;
     kept.forEach((f) => competitionFinals.push(f));
